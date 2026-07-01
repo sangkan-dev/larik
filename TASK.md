@@ -183,30 +183,30 @@
 
 ### 4.1 Command Registry
 
-- [ ] Buat command registry di frontend.
-- [ ] Buat command metadata:
-  - [ ] id
-  - [ ] title
-  - [ ] category
-  - [ ] shortcut optional
-  - [ ] handler
-- [ ] Register command dasar editor.
+- [x] Buat command registry di frontend.
+- [x] Buat command metadata:
+  - [x] id
+  - [x] title
+  - [x] category
+  - [x] shortcut optional
+  - [x] handler
+- [x] Register command dasar editor.
 
 ### 4.2 Command Palette
 
-- [ ] UI command palette.
-- [ ] Fuzzy search command.
-- [ ] Keyboard navigation.
-- [ ] Execute selected command.
-- [ ] Close on escape.
+- [x] UI command palette.
+- [x] Fuzzy search command.
+- [x] Keyboard navigation.
+- [x] Execute selected command.
+- [x] Close on escape.
 
 ### 4.3 Quick Open File
 
-- [ ] Index file path workspace.
-- [ ] Fuzzy search file.
-- [ ] Ignore folder berat.
-- [ ] Open selected file.
-- [ ] Keyboard navigation.
+- [x] Index file path workspace.
+- [x] Fuzzy search file.
+- [x] Ignore folder berat.
+- [x] Open selected file.
+- [x] Keyboard navigation.
 
 ---
 

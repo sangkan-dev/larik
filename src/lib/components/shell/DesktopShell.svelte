@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import CommandLauncher from "$lib/components/command/CommandLauncher.svelte";
   import MonacoEditor from "$lib/components/editor/MonacoEditor.svelte";
   import FileTree from "$lib/components/workspace/FileTree.svelte";
   import {
@@ -7,7 +8,13 @@
     keybindingFromEvent,
     type KeybindingCommandId,
   } from "$lib/commands/keybindings";
+  import {
+    baseCommandMetadata,
+    createCommandRegistry,
+  } from "$lib/commands/registry";
   import type { MonacoEditorController } from "$lib/editor/types";
+  import type { FuzzySearchItem } from "$lib/search/fuzzy";
+  import { indexWorkspaceFiles } from "$lib/workspace/fileIndex";
   import {
     activeDocument,
     activeFile,
@@ -64,6 +71,22 @@
   ];
 
   let editorController: MonacoEditorController | null = null;
+  let commandPaletteOpen = false;
+  let quickOpenOpen = false;
+
+  $: commandRegistry = createCommandRegistry(
+    baseCommandMetadata.map((command) => ({
+      ...command,
+      handler: () => executeCommand(command.id),
+    })),
+  );
+  $: commandPaletteItems = commandRegistry.all().map((command) => ({
+    id: command.id,
+    title: command.title,
+    subtitle: command.category,
+    shortcut: command.shortcut,
+  }));
+  $: quickOpenItems = indexWorkspaceFiles($fileTree.entries);
 
   onMount(() => {
     initializeWorkspace();
@@ -213,9 +236,9 @@
     if (command === "workspace.openFolder") openWorkspace();
     if (command === "editor.save") saveActiveDocument();
     if (command === "editor.saveAll") saveAllDocuments();
-    if (command === "file.quickOpen") console.info("Quick open placeholder");
+    if (command === "file.quickOpen") quickOpenOpen = true;
     if (command === "commandPalette.open") {
-      console.info("Command palette placeholder");
+      commandPaletteOpen = true;
     }
     if (command === "terminal.toggle") {
       setBottomView("terminal");
@@ -249,7 +272,15 @@
     }
 
     event.preventDefault();
-    executeCommand(binding.command);
+    commandRegistry.execute(binding.command);
+  }
+
+  function selectCommand(item: FuzzySearchItem) {
+    commandRegistry.execute(item.id as KeybindingCommandId);
+  }
+
+  function selectQuickOpenFile(item: FuzzySearchItem) {
+    openFile(item.id);
   }
 </script>
 
@@ -760,3 +791,25 @@
     </div>
   </footer>
 </main>
+
+<CommandLauncher
+  open={commandPaletteOpen}
+  title="Command Palette"
+  placeholder="Search commands"
+  items={commandPaletteItems}
+  onClose={() => {
+    commandPaletteOpen = false;
+  }}
+  onSelect={selectCommand}
+/>
+
+<CommandLauncher
+  open={quickOpenOpen}
+  title="Quick Open"
+  placeholder="Search files"
+  items={quickOpenItems}
+  onClose={() => {
+    quickOpenOpen = false;
+  }}
+  onSelect={selectQuickOpenFile}
+/>
