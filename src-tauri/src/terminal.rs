@@ -1,4 +1,4 @@
-use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -18,7 +18,7 @@ static NEXT_TERMINAL_ID: AtomicU64 = AtomicU64::new(1);
 pub struct TerminalState(pub Mutex<HashMap<String, TerminalSession>>);
 
 pub struct TerminalSession {
-    child: Box<dyn Child + Send + Sync>,
+    killer: Box<dyn ChildKiller + Send + Sync>,
     master: Box<dyn MasterPty + Send>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
 }
@@ -59,6 +59,8 @@ pub struct TerminalOutput {
 #[serde(rename_all = "camelCase")]
 pub struct TerminalExit {
     pub session_id: String,
+    pub exit_code: Option<u32>,
+    pub success: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -90,11 +92,15 @@ pub fn terminal_spawn(
     let shell = default_shell();
     let mut command = CommandBuilder::new(&shell);
     command.cwd(cwd);
+    if let Some(initial_command) = request.command.as_deref() {
+        configure_shell_command(&mut command, initial_command);
+    }
 
     let child = pair
         .slave
         .spawn_command(command)
         .map_err(|error| error.to_string())?;
+    let killer = child.clone_killer();
     let reader = pair
         .master
         .try_clone_reader()
@@ -106,14 +112,7 @@ pub fn terminal_spawn(
     let writer = Arc::new(Mutex::new(writer));
 
     stream_terminal_output(app.clone(), session_id.clone(), reader);
-
-    if let Some(initial_command) = request.command.as_deref() {
-        let mut locked_writer = writer.lock().map_err(|error| error.to_string())?;
-        locked_writer
-            .write_all(format!("{initial_command}\n").as_bytes())
-            .map_err(|error| error.to_string())?;
-        locked_writer.flush().map_err(|error| error.to_string())?;
-    }
+    wait_for_terminal_exit(app, session_id.clone(), child);
 
     let label = request.label.unwrap_or_else(|| {
         PathBuf::from(&shell)
@@ -124,7 +123,7 @@ pub fn terminal_spawn(
     });
 
     let session = TerminalSession {
-        child,
+        killer,
         master: pair.master,
         writer,
     };
@@ -179,7 +178,7 @@ pub fn terminal_kill(state: tauri::State<TerminalState>, session_id: String) -> 
         .remove(&session_id)
         .ok_or_else(|| "Terminal session not found".to_string())?;
 
-    let _ = session.child.kill();
+    let _ = session.killer.kill();
     Ok(())
 }
 
@@ -202,8 +201,29 @@ fn stream_terminal_output(app: AppHandle, session_id: String, mut reader: Box<dy
                 },
             );
         }
+    });
+}
 
-        let _ = app.emit("terminal://exit", TerminalExit { session_id });
+fn wait_for_terminal_exit(
+    app: AppHandle,
+    session_id: String,
+    mut child: Box<dyn Child + Send + Sync>,
+) {
+    thread::spawn(move || {
+        let status = child.wait().ok();
+        let exit_code = status.as_ref().map(|status| status.exit_code());
+        let success = status
+            .as_ref()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        let _ = app.emit(
+            "terminal://exit",
+            TerminalExit {
+                session_id,
+                exit_code,
+                success,
+            },
+        );
     });
 }
 
@@ -223,4 +243,14 @@ fn resolve_cwd(cwd: Option<&str>) -> Result<PathBuf, String> {
 
 fn default_shell() -> String {
     env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+}
+
+#[cfg(unix)]
+fn configure_shell_command(command: &mut CommandBuilder, initial_command: &str) {
+    command.args(["-lc", initial_command]);
+}
+
+#[cfg(windows)]
+fn configure_shell_command(command: &mut CommandBuilder, initial_command: &str) {
+    command.args(["/C", initial_command]);
 }

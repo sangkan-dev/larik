@@ -322,27 +322,27 @@
 
 ### 7.1 UI
 
-- [ ] Buat panel `Project`.
-- [ ] Tampilkan detected project type.
-- [ ] Tampilkan suggested actions.
-- [ ] Tampilkan env status.
-- [ ] Tampilkan scripts.
+- [x] Buat panel `Project`.
+- [x] Tampilkan detected project type.
+- [x] Tampilkan suggested actions.
+- [x] Tampilkan env status.
+- [x] Tampilkan scripts.
 
 ### 7.2 Action Runner
 
-- [ ] Run action di integrated terminal.
-- [ ] Support action working directory.
-- [ ] Support action label.
-- [ ] Tampilkan status running/done/failed.
-- [ ] Prevent duplicate dangerous action jika perlu.
+- [x] Run action di integrated terminal.
+- [x] Support action working directory.
+- [x] Support action label.
+- [x] Tampilkan status running/done/failed.
+- [x] Prevent duplicate dangerous action jika perlu.
 
 ### 7.3 Safety
 
-- [ ] Konfirmasi untuk action destructive:
-  - [ ] delete file;
-  - [ ] docker compose down;
-  - [ ] migration destructive di masa depan.
-- [ ] Jangan auto-run command setelah project dibuka.
+- [x] Konfirmasi untuk action destructive:
+  - [x] delete file;
+  - [x] docker compose down;
+  - [x] migration destructive di masa depan.
+- [x] Jangan auto-run command setelah project dibuka.
 
 ---
 

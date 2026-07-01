@@ -18,6 +18,9 @@
   import type { ProjectAction } from "$lib/services/projectDetector";
   import {
     clearProjectDetection,
+    markProjectActionFailed,
+    markProjectActionRunning,
+    projectActionRuns,
     projectDetection,
     scanProject,
   } from "$lib/stores/projectDetector";
@@ -330,6 +333,12 @@
   }
 
   async function runProjectAction(action: ProjectAction) {
+    const existingRun = $projectActionRuns[action.id];
+    if (action.destructive && existingRun?.status === "running") {
+      window.alert(`${action.label} is already running.`);
+      return;
+    }
+
     if (
       action.destructive &&
       !window.confirm(`Run destructive action: ${action.command}?`)
@@ -341,11 +350,19 @@
     if (!$panelState.bottomVisible) {
       toggleBottomPanel();
     }
-    await createTerminal({
-      cwd: action.cwd,
-      command: action.command,
-      label: action.label,
-    });
+    try {
+      const session = await createTerminal({
+        cwd: action.cwd,
+        command: action.command,
+        label: action.label,
+      });
+      markProjectActionRunning(action, session.id);
+    } catch (error) {
+      markProjectActionFailed(
+        action,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   function refreshProjectDetection() {
@@ -361,6 +378,50 @@
     return [framework, packageManager]
       .filter((item): item is string => typeof item === "string")
       .join(" / ");
+  }
+
+  function projectScripts(project: { details: Record<string, unknown> }) {
+    return Array.isArray(project.details.scripts)
+      ? project.details.scripts.filter(
+          (script): script is string => typeof script === "string",
+        )
+      : [];
+  }
+
+  function actionStatusLabel(action: ProjectAction) {
+    const run = $projectActionRuns[action.id];
+
+    if (!run) {
+      return action.destructive ? "confirm" : "ready";
+    }
+
+    if (run.status === "running") {
+      return "running";
+    }
+
+    if (run.status === "done") {
+      return run.exitCode === null ? "done" : `done ${run.exitCode}`;
+    }
+
+    return run.exitCode === null ? "failed" : `failed ${run.exitCode}`;
+  }
+
+  function actionStatusClass(action: ProjectAction) {
+    const run = $projectActionRuns[action.id];
+
+    if (run?.status === "running") {
+      return "text-[var(--info)]";
+    }
+    if (run?.status === "done") {
+      return "text-[var(--success)]";
+    }
+    if (run?.status === "failed") {
+      return "text-[var(--danger)]";
+    }
+
+    return action.destructive
+      ? "text-[var(--warning)]"
+      : "text-[var(--text-subtle)]";
   }
 </script>
 
@@ -601,6 +662,17 @@
                           {project.detectedFiles.join(", ")}
                         </p>
                       {/if}
+                      {#if projectScripts(project).length > 0}
+                        <div class="mt-2 flex flex-wrap gap-1">
+                          {#each projectScripts(project) as script}
+                            <span
+                              class="rounded border border-[var(--border-muted)] px-1.5 py-0.5 text-xs text-[var(--text-subtle)]"
+                            >
+                              {script}
+                            </span>
+                          {/each}
+                        </div>
+                      {/if}
                     </div>
                   {/each}
                 </div>
@@ -665,11 +737,20 @@
                   {#each $projectDetection.result.actions as action}
                     <button
                       type="button"
-                      class="h-8 w-full truncate rounded-md px-2 text-left text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                      class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
                       title={action.command}
+                      disabled={action.destructive &&
+                        $projectActionRuns[action.id]?.status === "running"}
                       onclick={() => runProjectAction(action)}
                     >
-                      {action.label}
+                      <span class="min-w-0 flex-1 truncate">
+                        {action.label}
+                      </span>
+                      <span
+                        class={`shrink-0 text-xs ${actionStatusClass(action)}`}
+                      >
+                        {actionStatusLabel(action)}
+                      </span>
                     </button>
                   {/each}
                 </div>

@@ -21,6 +21,8 @@ export type TerminalOutputEvent = {
 
 export type TerminalExitEvent = {
   sessionId: string;
+  exitCode: number | null;
+  success: boolean;
 };
 
 export function spawnTerminal(request: SpawnTerminalRequest) {

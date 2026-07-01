@@ -8,6 +8,7 @@ import {
   spawnTerminal,
   writeTerminal,
 } from "$lib/services/terminal";
+import { markProjectActionTerminalExit } from "$lib/stores/projectDetector";
 
 export type TerminalSession = {
   id: string;
@@ -15,6 +16,8 @@ export type TerminalSession = {
   cwd: string | null;
   active: boolean;
   exited: boolean;
+  exitCode: number | null;
+  success: boolean | null;
   output: string;
 };
 
@@ -37,6 +40,8 @@ export async function createTerminal(
     cwd: options.cwd ?? null,
     active: true,
     exited: false,
+    exitCode: null,
+    success: null,
     output: "",
   };
 
@@ -99,10 +104,17 @@ export async function registerTerminalEvents() {
   });
 
   await onTerminalExit((event) => {
+    markProjectActionTerminalExit(event);
     terminalSessions.update((sessions) =>
       sessions.map((session) =>
         session.id === event.sessionId
-          ? { ...session, exited: true, active: false }
+          ? {
+              ...session,
+              exited: true,
+              active: false,
+              exitCode: event.exitCode,
+              success: event.success,
+            }
           : session,
       ),
     );

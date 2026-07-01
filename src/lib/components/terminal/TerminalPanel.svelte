@@ -67,7 +67,13 @@
           >
             <span class="truncate">{session.label}</span>
             {#if session.exited}
-              <span class="text-[var(--warning)]">exit</span>
+              <span
+                class={session.success
+                  ? "text-[var(--success)]"
+                  : "text-[var(--warning)]"}
+              >
+                {session.exitCode === null ? "exit" : session.exitCode}
+              </span>
             {/if}
           </button>
         {/each}
