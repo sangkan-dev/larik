@@ -4,7 +4,7 @@
 > **Produk:** Larik / Larik Editor  
 > **Repo target:** `sangkan-dev/larik`  
 > **Tipe:** Open-source lightweight project-aware code editor  
-> **Stack awal:** Tauri v2, Rust, Svelte, TypeScript, Monaco Editor, xterm.js, LSP, Tree-sitter  
+> **Stack awal:** Tauri v2, Rust, Svelte, TypeScript, Monaco Editor, xterm.js, LSP, Tree-sitter
 
 ---
 

@@ -427,7 +427,9 @@ Rules:
 Example Tailwind-style:
 
 ```svelte
-<button class="h-8 rounded-md border border-border bg-surface px-3 text-sm text-text hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus-ring">
+<button
+  class="h-8 rounded-md border border-border bg-surface px-3 text-sm text-text hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus-ring"
+>
   Run Project
 </button>
 ```
@@ -890,39 +892,39 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: 'var(--background)',
-        surface: 'var(--surface)',
-        'surface-muted': 'var(--surface-muted)',
-        'surface-raised': 'var(--surface-raised)',
-        border: 'var(--border)',
-        'border-muted': 'var(--border-muted)',
-        text: 'var(--text)',
-        'text-muted': 'var(--text-muted)',
-        'text-subtle': 'var(--text-subtle)',
-        accent: 'var(--accent)',
-        'accent-hover': 'var(--accent-hover)',
-        'accent-muted': 'var(--accent-muted)',
-        warning: 'var(--warning)',
-        success: 'var(--success)',
-        danger: 'var(--danger)',
-        info: 'var(--info)',
-        'focus-ring': 'var(--focus-ring)',
-        selection: 'var(--selection)'
+        background: "var(--background)",
+        surface: "var(--surface)",
+        "surface-muted": "var(--surface-muted)",
+        "surface-raised": "var(--surface-raised)",
+        border: "var(--border)",
+        "border-muted": "var(--border-muted)",
+        text: "var(--text)",
+        "text-muted": "var(--text-muted)",
+        "text-subtle": "var(--text-subtle)",
+        accent: "var(--accent)",
+        "accent-hover": "var(--accent-hover)",
+        "accent-muted": "var(--accent-muted)",
+        warning: "var(--warning)",
+        success: "var(--success)",
+        danger: "var(--danger)",
+        info: "var(--info)",
+        "focus-ring": "var(--focus-ring)",
+        selection: "var(--selection)",
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'SFMono-Regular', 'Consolas', 'monospace']
+        sans: ["Inter", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "SFMono-Regular", "Consolas", "monospace"],
       },
       borderRadius: {
-        xs: '4px',
-        sm: '6px',
-        md: '8px',
-        lg: '12px',
-        xl: '16px'
-      }
-    }
-  }
-}
+        xs: "4px",
+        sm: "6px",
+        md: "8px",
+        lg: "12px",
+        xl: "16px",
+      },
+    },
+  },
+};
 ```
 
 ---

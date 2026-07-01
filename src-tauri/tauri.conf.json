@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "larik",
+  "productName": "Larik",
   "version": "0.1.0",
   "identifier": "com.sangkan.larik",
   "build": {
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "larik",
-        "width": 800,
-        "height": 600
+        "title": "Larik",
+        "width": 1200,
+        "height": 760,
+        "minWidth": 900,
+        "minHeight": 560
       }
     ],
     "security": {

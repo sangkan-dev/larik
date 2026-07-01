@@ -1,0 +1,5 @@
+set -e
+
+pnpm format:check
+pnpm lint
+cargo fmt --check --manifest-path src-tauri/Cargo.toml

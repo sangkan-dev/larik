@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+
+  --background: #0b0f10;
+  --surface: #101617;
+  --surface-muted: #151d1f;
+  --surface-raised: #1b2427;
+  --border: #263236;
+  --border-muted: #1c272a;
+  --text: #e6edf0;
+  --text-muted: #a8b4b8;
+  --text-subtle: #6f7d82;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-muted: #134e4a;
+  --warning: #f59e0b;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --info: #38bdf8;
+  --focus-ring: #2dd4bf;
+  --selection: #164e63;
+}
+
+:root.light {
+  --background: #f7f8f8;
+  --surface: #ffffff;
+  --surface-muted: #f0f3f3;
+  --surface-raised: #ffffff;
+  --border: #d7dfdf;
+  --border-muted: #e6ecec;
+  --text: #172022;
+  --text-muted: #526165;
+  --text-subtle: #7a898d;
+  --accent: #0f766e;
+  --accent-hover: #0d9488;
+  --accent-muted: #ccfbf1;
+  --warning: #d97706;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --info: #0284c7;
+  --focus-ring: #0f766e;
+  --selection: #bae6fd;
+}
+
+html,
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--selection);
+}

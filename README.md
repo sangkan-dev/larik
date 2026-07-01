@@ -6,6 +6,33 @@ This template should help get you started developing with Tauri, SvelteKit and T
 
 [VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
 
+## Development
+
+Install dependencies and run the standard checks:
+
+```bash
+pnpm install
+pnpm check
+pnpm lint
+pnpm format:check
+pnpm build
+```
+
+Git hooks are managed by Husky and installed by the package `prepare` script. The default hooks run:
+
+- `pre-commit`: `pnpm format:check`, `pnpm lint`, and `cargo fmt --check`
+- `pre-push`: `pnpm build`
+
+Rust checks run from the Tauri workspace:
+
+```bash
+cd src-tauri
+cargo fmt --check
+cargo check
+```
+
+On Linux, install the Tauri WebKit GTK development dependencies for your distribution before running `cargo check` or `pnpm tauri dev`.
+
 ## Tauri MCP Bridge
 
 This app includes `tauri-plugin-mcp-bridge` for local MCP-driven Tauri inspection and automation during development.

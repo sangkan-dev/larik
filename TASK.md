@@ -2,7 +2,7 @@
 
 > **Status:** Draft awal 0.1  
 > **Produk:** Larik Editor  
-> **Tujuan:** Menjadi task backlog awal untuk membangun MVP Larik secara bertahap.  
+> **Tujuan:** Menjadi task backlog awal untuk membangun MVP Larik secara bertahap.
 
 ---
 
@@ -19,34 +19,35 @@
 
 ### 0.1 Repository
 
-- [ ] Buat repo `sangkan-dev/larik`.
-- [ ] Tambahkan `README.md` awal.
-- [ ] Tambahkan `PRD.md`.
-- [ ] Tambahkan `TASK.md`.
-- [ ] Tambahkan `AGENTS.md`.
-- [ ] Tambahkan license `Apache-2.0 OR MIT`.
-- [ ] Tambahkan `.gitignore` untuk Rust, Node, Tauri, OS files.
-- [ ] Tambahkan `CONTRIBUTING.md` sederhana.
-- [ ] Tambahkan `CODE_OF_CONDUCT.md` jika repo mulai dibuka untuk publik.
+- [x] Buat repo `sangkan-dev/larik`.
+- [x] Tambahkan `README.md` awal.
+- [x] Tambahkan `PRD.md`.
+- [x] Tambahkan `TASK.md`.
+- [x] Tambahkan `AGENTS.md`.
+- [x] Tambahkan license `Apache-2.0 OR MIT`.
+- [x] Tambahkan `.gitignore` untuk Rust, Node, Tauri, OS files.
+- [x] Tambahkan `CONTRIBUTING.md` sederhana.
+- [x] Tambahkan `CODE_OF_CONDUCT.md` jika repo mulai dibuka untuk publik.
 
 ### 0.2 Tooling
 
-- [ ] Setup Tauri v2 project.
-- [ ] Setup Svelte + TypeScript.
-- [ ] Setup Tailwind CSS.
-- [ ] Setup formatter frontend.
-- [ ] Setup formatter Rust.
-- [ ] Setup linting frontend.
-- [ ] Setup GitHub Actions basic CI.
-- [ ] Setup build check untuk Linux.
+- [x] Setup Tauri v2 project.
+- [x] Setup Svelte + TypeScript.
+- [x] Setup Tailwind CSS.
+- [x] Setup formatter frontend.
+- [x] Setup formatter Rust.
+- [x] Setup linting frontend.
+- [x] Setup Git hooks via Husky.
+- [x] Setup GitHub Actions basic CI.
+- [x] Setup build check untuk Linux.
 
 ### 0.3 Project Metadata
 
-- [ ] Tentukan app name: `Larik`.
-- [ ] Tentukan binary name: `larik`.
-- [ ] Tentukan identifier aplikasi Tauri.
-- [ ] Tambahkan app icon sementara.
-- [ ] Tambahkan dark/light theme sementara.
+- [x] Tentukan app name: `Larik`.
+- [x] Tentukan binary name: `larik`.
+- [x] Tentukan identifier aplikasi Tauri.
+- [x] Tambahkan app icon sementara.
+- [x] Tambahkan dark/light theme sementara.
 
 ---
 
