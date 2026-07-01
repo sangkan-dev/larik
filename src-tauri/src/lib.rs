@@ -3,6 +3,7 @@ use tauri::{
     Manager,
 };
 
+mod project_detector;
 mod terminal;
 mod workspace;
 
@@ -66,6 +67,7 @@ pub fn run() {
             workspace::rename_workspace_entry,
             workspace::delete_workspace_entry,
             workspace::start_workspace_watch,
+            project_detector::detect_project,
             terminal::terminal_spawn,
             terminal::terminal_write,
             terminal::terminal_resize,

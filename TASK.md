@@ -243,78 +243,78 @@
 
 ### 6.1 Detector Core
 
-- [ ] Buat module `project_detector` di Rust.
-- [ ] Scan root workspace secara ringan.
-- [ ] Return detected project types.
-- [ ] Return confidence score sederhana.
-- [ ] Return suggested actions.
+- [x] Buat module `project_detector` di Rust.
+- [x] Scan root workspace secara ringan.
+- [x] Return detected project types.
+- [x] Return confidence score sederhana.
+- [x] Return suggested actions.
 
 ### 6.2 Node / JS / TS Detector
 
-- [ ] Deteksi `package.json`.
-- [ ] Parse package manager:
-  - [ ] npm
-  - [ ] pnpm
-  - [ ] yarn
-  - [ ] bun
-- [ ] Parse scripts dari `package.json`.
-- [ ] Deteksi framework:
-  - [ ] SvelteKit
-  - [ ] Vite
-  - [ ] Next.js
-  - [ ] Express / generic Node
-- [ ] Tampilkan action `install`, `dev`, `build`, `test` jika ada.
+- [x] Deteksi `package.json`.
+- [x] Parse package manager:
+  - [x] npm
+  - [x] pnpm
+  - [x] yarn
+  - [x] bun
+- [x] Parse scripts dari `package.json`.
+- [x] Deteksi framework:
+  - [x] SvelteKit
+  - [x] Vite
+  - [x] Next.js
+  - [x] Express / generic Node
+- [x] Tampilkan action `install`, `dev`, `build`, `test` jika ada.
 
 ### 6.3 PHP / Laravel Detector
 
-- [ ] Deteksi `composer.json`.
-- [ ] Deteksi Laravel via `artisan`.
-- [ ] Deteksi `app/`, `routes/`, `database/migrations`.
-- [ ] Tampilkan action:
-  - [ ] `composer install`
-  - [ ] `php artisan serve`
-  - [ ] `php artisan migrate`
-  - [ ] `php artisan queue:work`
-  - [ ] `php artisan test`
-- [ ] Deteksi `.env.example` dan `.env`.
+- [x] Deteksi `composer.json`.
+- [x] Deteksi Laravel via `artisan`.
+- [x] Deteksi `app/`, `routes/`, `database/migrations`.
+- [x] Tampilkan action:
+  - [x] `composer install`
+  - [x] `php artisan serve`
+  - [x] `php artisan migrate`
+  - [x] `php artisan queue:work`
+  - [x] `php artisan test`
+- [x] Deteksi `.env.example` dan `.env`.
 
 ### 6.4 Rust Detector
 
-- [ ] Deteksi `Cargo.toml`.
-- [ ] Parse package name.
-- [ ] Tampilkan action:
-  - [ ] `cargo check`
-  - [ ] `cargo run`
-  - [ ] `cargo test`
-  - [ ] `cargo build`
+- [x] Deteksi `Cargo.toml`.
+- [x] Parse package name.
+- [x] Tampilkan action:
+  - [x] `cargo check`
+  - [x] `cargo run`
+  - [x] `cargo test`
+  - [x] `cargo build`
 
 ### 6.5 Go Detector
 
-- [ ] Deteksi `go.mod`.
-- [ ] Parse module name.
-- [ ] Tampilkan action:
-  - [ ] `go run .`
-  - [ ] `go test ./...`
-  - [ ] `go build ./...`
+- [x] Deteksi `go.mod`.
+- [x] Parse module name.
+- [x] Tampilkan action:
+  - [x] `go run .`
+  - [x] `go test ./...`
+  - [x] `go build ./...`
 
 ### 6.6 Docker Compose Detector
 
-- [ ] Deteksi `docker-compose.yml`.
-- [ ] Deteksi `compose.yml`.
-- [ ] Tampilkan action:
-  - [ ] `docker compose up`
-  - [ ] `docker compose up -d`
-  - [ ] `docker compose down`
-  - [ ] `docker compose logs -f`
-  - [ ] `docker compose ps`
+- [x] Deteksi `docker-compose.yml`.
+- [x] Deteksi `compose.yml`.
+- [x] Tampilkan action:
+  - [x] `docker compose up`
+  - [x] `docker compose up -d`
+  - [x] `docker compose down`
+  - [x] `docker compose logs -f`
+  - [x] `docker compose ps`
 
 ### 6.7 Env Detector
 
-- [ ] Deteksi `.env`.
-- [ ] Deteksi `.env.example`.
-- [ ] Compare missing keys.
-- [ ] Tampilkan warning jika `.env` belum ada.
-- [ ] Tampilkan daftar key yang belum terisi.
+- [x] Deteksi `.env`.
+- [x] Deteksi `.env.example`.
+- [x] Compare missing keys.
+- [x] Tampilkan warning jika `.env` belum ada.
+- [x] Tampilkan daftar key yang belum terisi.
 
 ---
 

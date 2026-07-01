@@ -15,6 +15,12 @@
   } from "$lib/commands/registry";
   import type { MonacoEditorController } from "$lib/editor/types";
   import type { FuzzySearchItem } from "$lib/search/fuzzy";
+  import type { ProjectAction } from "$lib/services/projectDetector";
+  import {
+    clearProjectDetection,
+    projectDetection,
+    scanProject,
+  } from "$lib/stores/projectDetector";
   import { createTerminal, registerTerminalEvents } from "$lib/stores/terminal";
   import { indexWorkspaceFiles } from "$lib/workspace/fileIndex";
   import {
@@ -75,6 +81,7 @@
   let editorController: MonacoEditorController | null = null;
   let commandPaletteOpen = false;
   let quickOpenOpen = false;
+  let detectedRootPath: string | null = null;
 
   $: commandRegistry = createCommandRegistry(
     baseCommandMetadata.map((command) => ({
@@ -89,6 +96,13 @@
     shortcut: command.shortcut,
   }));
   $: quickOpenItems = indexWorkspaceFiles($fileTree.entries);
+  $: if ($workspace.rootPath && $workspace.rootPath !== detectedRootPath) {
+    detectedRootPath = $workspace.rootPath;
+    scanProject($workspace.rootPath);
+  } else if (!$workspace.rootPath && detectedRootPath) {
+    detectedRootPath = null;
+    clearProjectDetection();
+  }
 
   onMount(() => {
     initializeWorkspace();
@@ -314,6 +328,40 @@
       label: command,
     });
   }
+
+  async function runProjectAction(action: ProjectAction) {
+    if (
+      action.destructive &&
+      !window.confirm(`Run destructive action: ${action.command}?`)
+    ) {
+      return;
+    }
+
+    setBottomView("terminal");
+    if (!$panelState.bottomVisible) {
+      toggleBottomPanel();
+    }
+    await createTerminal({
+      cwd: action.cwd,
+      command: action.command,
+      label: action.label,
+    });
+  }
+
+  function refreshProjectDetection() {
+    if ($workspace.rootPath) {
+      scanProject($workspace.rootPath);
+    }
+  }
+
+  function projectDetail(project: { details: Record<string, unknown> }) {
+    const framework = project.details.framework;
+    const packageManager = project.details.packageManager;
+
+    return [framework, packageManager]
+      .filter((item): item is string => typeof item === "string")
+      .join(" / ");
+  }
 </script>
 
 <main
@@ -496,9 +544,138 @@
               {/if}
             {/if}
           {:else if $panelState.activeView === "project"}
-            <p class="mb-3 text-xs text-[var(--text-subtle)]">
-              Project actions will be detected after workspace scanning.
-            </p>
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <p class="text-xs font-medium text-[var(--text-muted)]">
+                Detection
+              </p>
+              <button
+                type="button"
+                class="grid size-7 place-items-center rounded text-xs text-[var(--text-subtle)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                title="Refresh project detection"
+                aria-label="Refresh project detection"
+                onclick={refreshProjectDetection}
+              >
+                ↻
+              </button>
+            </div>
+
+            {#if !$workspace.rootPath}
+              <p class="mb-3 text-xs text-[var(--text-subtle)]">
+                Open a workspace to detect project actions.
+              </p>
+            {:else if $projectDetection.loading}
+              <p class="mb-3 text-xs text-[var(--text-subtle)]">
+                Scanning workspace...
+              </p>
+            {:else if $projectDetection.error}
+              <p class="mb-3 text-xs text-[var(--danger)]">
+                {$projectDetection.error}
+              </p>
+            {:else if $projectDetection.result}
+              {#if $projectDetection.result.detected.length > 0}
+                <div class="mb-4 space-y-2">
+                  {#each $projectDetection.result.detected as project}
+                    <div
+                      class="rounded-md border border-[var(--border-muted)] bg-[var(--background)] p-2"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="truncate text-sm text-[var(--text)]">
+                          {project.name}
+                        </p>
+                        <span
+                          class="shrink-0 text-xs text-[var(--text-subtle)]"
+                        >
+                          {Math.round(project.confidence * 100)}%
+                        </span>
+                      </div>
+                      <p class="mt-1 truncate text-xs text-[var(--text-muted)]">
+                        {project.kind}{projectDetail(project)
+                          ? ` / ${projectDetail(project)}`
+                          : ""}
+                      </p>
+                      {#if project.detectedFiles.length > 0}
+                        <p
+                          class="mt-1 truncate text-xs text-[var(--text-subtle)]"
+                          title={project.detectedFiles.join(", ")}
+                        >
+                          {project.detectedFiles.join(", ")}
+                        </p>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <p class="mb-3 text-xs text-[var(--text-subtle)]">
+                  No project type detected yet.
+                </p>
+              {/if}
+
+              {#if $projectDetection.result.warnings.length > 0}
+                <div class="mb-4 space-y-1">
+                  <p class="text-xs font-medium text-[var(--warning)]">
+                    Warnings
+                  </p>
+                  {#each $projectDetection.result.warnings as warning}
+                    <p class="text-xs text-[var(--text-muted)]">{warning}</p>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if $projectDetection.result.env.hasEnv || $projectDetection.result.env.hasEnvExample}
+                <div class="mb-4 space-y-1">
+                  <p class="text-xs font-medium text-[var(--text-muted)]">
+                    Environment
+                  </p>
+                  <p class="text-xs text-[var(--text-muted)]">
+                    .env:
+                    {$projectDetection.result.env.hasEnv ? "found" : "missing"}
+                    / .env.example:
+                    {$projectDetection.result.env.hasEnvExample
+                      ? "found"
+                      : "missing"}
+                  </p>
+                  {#if $projectDetection.result.env.missingKeys.length > 0}
+                    <p
+                      class="text-xs text-[var(--warning)]"
+                      title={$projectDetection.result.env.missingKeys.join(
+                        ", ",
+                      )}
+                    >
+                      Missing keys:
+                      {$projectDetection.result.env.missingKeys.join(", ")}
+                    </p>
+                  {/if}
+                  {#if $projectDetection.result.env.emptyKeys.length > 0}
+                    <p
+                      class="text-xs text-[var(--warning)]"
+                      title={$projectDetection.result.env.emptyKeys.join(", ")}
+                    >
+                      Empty keys:
+                      {$projectDetection.result.env.emptyKeys.join(", ")}
+                    </p>
+                  {/if}
+                </div>
+              {/if}
+
+              {#if $projectDetection.result.actions.length > 0}
+                <div class="mb-4 space-y-1">
+                  <p class="text-xs font-medium text-[var(--text-muted)]">
+                    Actions
+                  </p>
+                  {#each $projectDetection.result.actions as action}
+                    <button
+                      type="button"
+                      class="h-8 w-full truncate rounded-md px-2 text-left text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                      title={action.command}
+                      onclick={() => runProjectAction(action)}
+                    >
+                      {action.label}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            {/if}
+
             <div class="space-y-1">
               <button
                 type="button"
