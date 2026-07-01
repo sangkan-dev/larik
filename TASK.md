@@ -135,47 +135,47 @@
 
 ### 3.1 Monaco Integration
 
-- [ ] Install Monaco Editor.
-- [ ] Render Monaco di editor area.
-- [ ] Support multiple file models.
-- [ ] Dispose model ketika tab ditutup.
-- [ ] Set language mode berdasarkan file extension.
-- [ ] Set theme dark/light.
+- [x] Install Monaco Editor.
+- [x] Render Monaco di editor area.
+- [x] Support multiple file models.
+- [x] Dispose model ketika tab ditutup.
+- [x] Set language mode berdasarkan file extension.
+- [x] Set theme dark/light.
 
 ### 3.2 Tabs
 
-- [ ] Open file sebagai tab.
-- [ ] Switch tab.
-- [ ] Close tab.
-- [ ] Close other tabs.
-- [ ] Close all tabs.
-- [ ] Reopen recently closed tab.
-- [ ] Show dirty indicator.
+- [x] Open file sebagai tab.
+- [x] Switch tab.
+- [x] Close tab.
+- [x] Close other tabs.
+- [x] Close all tabs.
+- [x] Reopen recently closed tab.
+- [x] Show dirty indicator.
 
 ### 3.3 Editor UX
 
-- [ ] Basic find in file.
-- [ ] Basic replace in file.
-- [ ] Go to line.
-- [ ] Minimap toggle.
-- [ ] Word wrap toggle.
-- [ ] Format document placeholder.
-- [ ] Save shortcut.
-- [ ] Save all shortcut.
+- [x] Basic find in file.
+- [x] Basic replace in file.
+- [x] Go to line.
+- [x] Minimap toggle.
+- [x] Word wrap toggle.
+- [x] Format document placeholder.
+- [x] Save shortcut.
+- [x] Save all shortcut.
 
 ### 3.4 Keybindings
 
-- [ ] Implement keybinding registry awal.
-- [ ] Tambahkan shortcut dasar:
-  - [ ] Open folder
-  - [ ] Save
-  - [ ] Save all
-  - [ ] Quick open
-  - [ ] Command palette
-  - [ ] Toggle terminal
-  - [ ] Toggle sidebar
-  - [ ] Close tab
-- [ ] Buat format keybindings JSON sederhana.
+- [x] Implement keybinding registry awal.
+- [x] Tambahkan shortcut dasar:
+  - [x] Open folder
+  - [x] Save
+  - [x] Save all
+  - [x] Quick open
+  - [x] Command palette
+  - [x] Toggle terminal
+  - [x] Toggle sidebar
+  - [x] Close tab
+- [x] Buat format keybindings JSON sederhana.
 
 ---
 

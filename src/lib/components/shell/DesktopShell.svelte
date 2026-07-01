@@ -1,14 +1,24 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import MonacoEditor from "$lib/components/editor/MonacoEditor.svelte";
   import FileTree from "$lib/components/workspace/FileTree.svelte";
+  import {
+    defaultKeybindings,
+    keybindingFromEvent,
+    type KeybindingCommandId,
+  } from "$lib/commands/keybindings";
+  import type { MonacoEditorController } from "$lib/editor/types";
   import {
     activeDocument,
     activeFile,
     activeTab,
+    closeAllTabs,
+    closeOtherTabs,
     closeTab,
     createEntry,
     deleteEntry,
     diskChange,
+    editorPreferences,
     expandedFolders,
     fileTree,
     initializeWorkspace,
@@ -21,13 +31,17 @@
     reloadDiskChangedDocument,
     reloadFileTree,
     renameEntry,
+    reopenRecentlyClosedTab,
     saveActiveDocument,
+    saveAllDocuments,
     setActiveView,
     setBottomHeight,
     setBottomView,
     setSidebarWidth,
     tabs,
     toggleBottomPanel,
+    toggleEditorMinimap,
+    toggleEditorWordWrap,
     toggleFolder,
     toggleSidebar,
     updateActiveDocument,
@@ -49,9 +63,14 @@
     { id: "output", label: "Output" },
   ];
 
+  let editorController: MonacoEditorController | null = null;
+
   onMount(() => {
     initializeWorkspace();
     registerWorkspaceWatcher();
+    window.addEventListener("keydown", handleKeydown);
+
+    return () => window.removeEventListener("keydown", handleKeydown);
   });
 
   function resizeSidebar(event: PointerEvent) {
@@ -135,7 +154,102 @@
       );
     }
 
-    closeTab(tabId);
+    if (closeTab(tabId)) {
+      editorController?.disposeModel(tab.path);
+    }
+  }
+
+  function closeOtherTabsWithConfirmation(tabId: string) {
+    const dirtyTabs = $tabs.filter((tab) => tab.id !== tabId && tab.dirty);
+
+    if (
+      dirtyTabs.length > 0 &&
+      !window.confirm("Close other tabs with unsaved changes?")
+    ) {
+      return;
+    }
+
+    for (const tab of $tabs) {
+      if (tab.id !== tabId && tab.id !== "welcome") {
+        editorController?.disposeModel(tab.path);
+      }
+    }
+
+    if (dirtyTabs.length > 0) {
+      tabs.update((items) =>
+        items.map((item) =>
+          item.id !== tabId ? { ...item, dirty: false } : item,
+        ),
+      );
+    }
+
+    closeOtherTabs(tabId);
+  }
+
+  function closeAllTabsWithConfirmation() {
+    const dirtyTabs = $tabs.filter((tab) => tab.dirty);
+
+    if (
+      dirtyTabs.length > 0 &&
+      !window.confirm("Close all tabs with unsaved changes?")
+    ) {
+      return;
+    }
+
+    for (const tab of $tabs) {
+      if (tab.id !== "welcome") {
+        editorController?.disposeModel(tab.path);
+      }
+    }
+
+    if (dirtyTabs.length > 0) {
+      tabs.update((items) => items.map((item) => ({ ...item, dirty: false })));
+    }
+
+    closeAllTabs();
+  }
+
+  function executeCommand(command: KeybindingCommandId) {
+    if (command === "workspace.openFolder") openWorkspace();
+    if (command === "editor.save") saveActiveDocument();
+    if (command === "editor.saveAll") saveAllDocuments();
+    if (command === "file.quickOpen") console.info("Quick open placeholder");
+    if (command === "commandPalette.open") {
+      console.info("Command palette placeholder");
+    }
+    if (command === "terminal.toggle") {
+      setBottomView("terminal");
+      toggleBottomPanel();
+    }
+    if (command === "view.toggleSidebar") toggleSidebar();
+    if (command === "editor.closeTab" && $activeTab) {
+      closeTabWithConfirmation($activeTab.id);
+    }
+    if (command === "editor.find") editorController?.find();
+    if (command === "editor.replace") editorController?.replace();
+    if (command === "editor.goToLine") editorController?.goToLine();
+    if (command === "editor.toggleMinimap") {
+      toggleEditorMinimap();
+      editorController?.toggleMinimap();
+    }
+    if (command === "editor.toggleWordWrap") {
+      toggleEditorWordWrap();
+      editorController?.toggleWordWrap();
+    }
+    if (command === "editor.formatDocument") editorController?.formatDocument();
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    const binding = defaultKeybindings.find(
+      (item) => item.key === keybindingFromEvent(event),
+    );
+
+    if (!binding) {
+      return;
+    }
+
+    event.preventDefault();
+    executeCommand(binding.command);
   }
 </script>
 
@@ -432,20 +546,75 @@
                 class="flex h-9 shrink-0 items-center justify-between border-b border-[var(--border-muted)] px-3 text-xs text-[var(--text-subtle)]"
               >
                 <span class="truncate">{$activeDocument.path}</span>
-                <button
-                  type="button"
-                  class="rounded-md border border-[var(--border)] px-3 py-1 text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
-                  onclick={saveActiveDocument}
-                >
-                  Save
-                </button>
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                    onclick={() => editorController?.find()}
+                  >
+                    Find
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                    onclick={() => editorController?.replace()}
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                    onclick={() => editorController?.goToLine()}
+                  >
+                    Go
+                  </button>
+                  <button
+                    type="button"
+                    class={`rounded-md px-2 py-1 ${$editorPreferences.minimap ? "bg-[var(--surface-muted)] text-[var(--text)]" : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"}`}
+                    onclick={() => {
+                      toggleEditorMinimap();
+                      editorController?.toggleMinimap();
+                    }}
+                  >
+                    Minimap
+                  </button>
+                  <button
+                    type="button"
+                    class={`rounded-md px-2 py-1 ${$editorPreferences.wordWrap ? "bg-[var(--surface-muted)] text-[var(--text)]" : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"}`}
+                    onclick={() => {
+                      toggleEditorWordWrap();
+                      editorController?.toggleWordWrap();
+                    }}
+                  >
+                    Wrap
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-1 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                    onclick={() => editorController?.formatDocument()}
+                  >
+                    Format
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md border border-[var(--border)] px-3 py-1 text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
+                    onclick={saveActiveDocument}
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
-              <textarea
-                class="min-h-0 flex-1 resize-none bg-[var(--background)] p-4 font-mono text-sm leading-6 text-[var(--text)] outline-none"
-                spellcheck="false"
-                value={$activeDocument.content}
-                oninput={(event) =>
-                  updateActiveDocument(event.currentTarget.value)}></textarea>
+              <MonacoEditor
+                path={$activeDocument.path}
+                content={$activeDocument.content}
+                theme={$editorPreferences.theme}
+                minimap={$editorPreferences.minimap}
+                wordWrap={$editorPreferences.wordWrap}
+                onChange={updateActiveDocument}
+                onReady={(controller) => {
+                  editorController = controller;
+                }}
+              />
             </div>
           {/if}
         {:else}
@@ -527,7 +696,41 @@
             {:else if $panelState.bottomView === "problems"}
               <p>No problems detected.</p>
             {:else}
-              <p>Workspace events and command output will appear here.</p>
+              <div class="space-y-2">
+                <p>Workspace events and command output will appear here.</p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                    onclick={saveAllDocuments}
+                  >
+                    Save all
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                    onclick={() =>
+                      $activeTab &&
+                      closeOtherTabsWithConfirmation($activeTab.id)}
+                  >
+                    Close other tabs
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                    onclick={closeAllTabsWithConfirmation}
+                  >
+                    Close all tabs
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                    onclick={reopenRecentlyClosedTab}
+                  >
+                    Reopen closed tab
+                  </button>
+                </div>
+              </div>
             {/if}
           </div>
         </section>

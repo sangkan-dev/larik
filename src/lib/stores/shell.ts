@@ -43,6 +43,17 @@ export type OpenDocument = {
   diskChanged: boolean;
 };
 
+export type ClosedTab = {
+  tab: EditorTab;
+  document: OpenDocument;
+};
+
+export type EditorPreferenceState = {
+  theme: "larik-dark" | "larik-light";
+  minimap: boolean;
+  wordWrap: boolean;
+};
+
 export type FileTreeState = {
   entries: FileTreeEntry[];
   loading: boolean;
@@ -85,6 +96,12 @@ const defaultPanelState: PanelState = {
   bottomView: "terminal",
   sidebarWidth: 260,
   bottomHeight: 240,
+};
+
+const defaultEditorPreferences: EditorPreferenceState = {
+  theme: "larik-dark",
+  minimap: false,
+  wordWrap: false,
 };
 
 function createPersistedStore<T>(key: string, initialValue: T) {
@@ -165,10 +182,15 @@ export const expandedFolders = createPersistedStore<string[]>(
   [],
 );
 export const documents = writable<Record<string, OpenDocument>>({});
+export const recentlyClosedTabs = writable<ClosedTab[]>([]);
 export const diskChange = writable<DiskChangeState>(null);
 export const panelState = createPersistedStore<PanelState>(
   "larik.shell.panels",
   defaultPanelState,
+);
+export const editorPreferences = createPersistedStore<EditorPreferenceState>(
+  "larik.editor.preferences",
+  defaultEditorPreferences,
 );
 
 export const activeTab = derived([tabs, activeFile], ([$tabs, $activeFile]) => {
@@ -237,8 +259,10 @@ export function resetShellState() {
   fileTree.set({ entries: [], loading: false, error: null });
   expandedFolders.set([]);
   documents.set({});
+  recentlyClosedTabs.set([]);
   diskChange.set(null);
   panelState.set(defaultPanelState);
+  editorPreferences.set(defaultEditorPreferences);
 }
 
 export function getPanelStateSnapshot() {
@@ -279,6 +303,7 @@ export async function openWorkspace(path?: string) {
   tabs.set(defaultTabs);
   activeFile.set(defaultTabs[0]?.id ?? null);
   documents.set({});
+  recentlyClosedTabs.set([]);
   diskChange.set(null);
   expandedFolders.set([selectedPath]);
   await setWindowWorkspaceTitle(nextWorkspace.name);
@@ -389,11 +414,49 @@ export async function saveActiveDocument() {
   markTabDirty(document.path, false);
 }
 
+export async function saveAllDocuments() {
+  const rootPath = get(workspace).rootPath;
+
+  if (!rootPath) {
+    return;
+  }
+
+  const openDocuments = Object.values(get(documents)).filter(
+    (document) =>
+      !document.binary &&
+      !document.tooLarge &&
+      document.content !== document.savedContent,
+  );
+
+  for (const document of openDocuments) {
+    await writeWorkspaceFile(rootPath, document.path, document.content);
+    documents.update((currentDocuments) => ({
+      ...currentDocuments,
+      [document.path]: {
+        ...currentDocuments[document.path],
+        savedContent: document.content,
+        diskChanged: false,
+      },
+    }));
+    markTabDirty(document.path, false);
+  }
+}
+
 export function closeTab(tabId: string) {
   const targetTab = get(tabs).find((tab) => tab.id === tabId);
+  const targetDocument = get(documents)[targetTab?.path ?? ""];
 
   if (!targetTab || targetTab.dirty) {
     return false;
+  }
+
+  if (targetDocument) {
+    recentlyClosedTabs.update((closedTabs) =>
+      [{ tab: targetTab, document: targetDocument }, ...closedTabs].slice(
+        0,
+        10,
+      ),
+    );
   }
 
   tabs.update((currentTabs) => {
@@ -412,6 +475,109 @@ export function closeTab(tabId: string) {
   }
 
   return true;
+}
+
+export function closeOtherTabs(tabId: string) {
+  const activeTabs = get(tabs);
+  const targetTab = activeTabs.find((tab) => tab.id === tabId);
+
+  if (!targetTab) {
+    return false;
+  }
+
+  const closingTabs = activeTabs.filter(
+    (tab) => tab.id !== tabId && tab.id !== "welcome",
+  );
+
+  if (closingTabs.some((tab) => tab.dirty)) {
+    return false;
+  }
+
+  const currentDocuments = get(documents);
+  recentlyClosedTabs.update((closedTabs) =>
+    [
+      ...closingTabs
+        .map((tab) =>
+          currentDocuments[tab.path]
+            ? { tab, document: currentDocuments[tab.path] }
+            : null,
+        )
+        .filter((item): item is ClosedTab => Boolean(item)),
+      ...closedTabs,
+    ].slice(0, 10),
+  );
+  tabs.set([targetTab]);
+  activeFile.set(targetTab.id);
+  documents.set(
+    targetTab.path === "larik://welcome" || !currentDocuments[targetTab.path]
+      ? {}
+      : { [targetTab.path]: currentDocuments[targetTab.path] },
+  );
+  return true;
+}
+
+export function closeAllTabs() {
+  const activeTabs = get(tabs).filter((tab) => tab.id !== "welcome");
+
+  if (activeTabs.some((tab) => tab.dirty)) {
+    return false;
+  }
+
+  const currentDocuments = get(documents);
+  recentlyClosedTabs.update((closedTabs) =>
+    [
+      ...activeTabs
+        .map((tab) =>
+          currentDocuments[tab.path]
+            ? { tab, document: currentDocuments[tab.path] }
+            : null,
+        )
+        .filter((item): item is ClosedTab => Boolean(item)),
+      ...closedTabs,
+    ].slice(0, 10),
+  );
+  tabs.set(defaultTabs);
+  activeFile.set(defaultTabs[0]?.id ?? null);
+  documents.set({});
+  return true;
+}
+
+export function reopenRecentlyClosedTab() {
+  const [closedTab, ...remainingTabs] = get(recentlyClosedTabs);
+
+  if (!closedTab) {
+    return;
+  }
+
+  documents.update((currentDocuments) => ({
+    ...currentDocuments,
+    [closedTab.document.path]: closedTab.document,
+  }));
+  tabs.update((currentTabs) =>
+    currentTabs.some((tab) => tab.id === closedTab.tab.id)
+      ? currentTabs
+      : [...currentTabs.filter((tab) => tab.id !== "welcome"), closedTab.tab],
+  );
+  activeFile.set(closedTab.tab.id);
+  recentlyClosedTabs.set(remainingTabs);
+}
+
+export function setEditorTheme(theme: EditorPreferenceState["theme"]) {
+  editorPreferences.update((preferences) => ({ ...preferences, theme }));
+}
+
+export function toggleEditorMinimap() {
+  editorPreferences.update((preferences) => ({
+    ...preferences,
+    minimap: !preferences.minimap,
+  }));
+}
+
+export function toggleEditorWordWrap() {
+  editorPreferences.update((preferences) => ({
+    ...preferences,
+    wordWrap: !preferences.wordWrap,
+  }));
 }
 
 export async function createEntry(

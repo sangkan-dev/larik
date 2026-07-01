@@ -1,0 +1,16 @@
+[
+  { "command": "workspace.openFolder", "key": "Ctrl+O" },
+  { "command": "editor.save", "key": "Ctrl+S" },
+  { "command": "editor.saveAll", "key": "Ctrl+Shift+S" },
+  { "command": "file.quickOpen", "key": "Ctrl+P" },
+  { "command": "commandPalette.open", "key": "Ctrl+Shift+P" },
+  { "command": "terminal.toggle", "key": "Ctrl+`" },
+  { "command": "view.toggleSidebar", "key": "Ctrl+B" },
+  { "command": "editor.closeTab", "key": "Ctrl+W" },
+  { "command": "editor.find", "key": "Ctrl+F" },
+  { "command": "editor.replace", "key": "Ctrl+H" },
+  { "command": "editor.goToLine", "key": "Ctrl+G" },
+  { "command": "editor.toggleMinimap", "key": "Alt+M" },
+  { "command": "editor.toggleWordWrap", "key": "Alt+Z" },
+  { "command": "editor.formatDocument", "key": "Alt+Shift+F" }
+]
