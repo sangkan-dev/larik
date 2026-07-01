@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import CommandLauncher from "$lib/components/command/CommandLauncher.svelte";
   import MonacoEditor from "$lib/components/editor/MonacoEditor.svelte";
+  import TerminalPanel from "$lib/components/terminal/TerminalPanel.svelte";
   import FileTree from "$lib/components/workspace/FileTree.svelte";
   import {
     defaultKeybindings,
@@ -14,6 +15,7 @@
   } from "$lib/commands/registry";
   import type { MonacoEditorController } from "$lib/editor/types";
   import type { FuzzySearchItem } from "$lib/search/fuzzy";
+  import { createTerminal, registerTerminalEvents } from "$lib/stores/terminal";
   import { indexWorkspaceFiles } from "$lib/workspace/fileIndex";
   import {
     activeDocument,
@@ -91,6 +93,7 @@
   onMount(() => {
     initializeWorkspace();
     registerWorkspaceWatcher();
+    registerTerminalEvents();
     window.addEventListener("keydown", handleKeydown);
 
     return () => window.removeEventListener("keydown", handleKeydown);
@@ -282,6 +285,35 @@
   function selectQuickOpenFile(item: FuzzySearchItem) {
     openFile(item.id);
   }
+
+  async function createWorkspaceTerminal() {
+    setBottomView("terminal");
+    if (!$panelState.bottomVisible) {
+      toggleBottomPanel();
+    }
+    await createTerminal({
+      cwd: $workspace.rootPath,
+      label: "shell",
+    });
+  }
+
+  async function runWorkspaceCommand() {
+    const command = window.prompt("Run command in workspace");
+
+    if (!command) {
+      return;
+    }
+
+    setBottomView("terminal");
+    if (!$panelState.bottomVisible) {
+      toggleBottomPanel();
+    }
+    await createTerminal({
+      cwd: $workspace.rootPath,
+      command,
+      label: command,
+    });
+  }
 </script>
 
 <main
@@ -464,9 +496,25 @@
               {/if}
             {/if}
           {:else if $panelState.activeView === "project"}
-            <p class="text-xs text-[var(--text-subtle)]">
+            <p class="mb-3 text-xs text-[var(--text-subtle)]">
               Project actions will be detected after workspace scanning.
             </p>
+            <div class="space-y-1">
+              <button
+                type="button"
+                class="h-8 w-full rounded-md px-2 text-left text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                onclick={createWorkspaceTerminal}
+              >
+                New terminal
+              </button>
+              <button
+                type="button"
+                class="h-8 w-full rounded-md px-2 text-left text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                onclick={runWorkspaceCommand}
+              >
+                Run command
+              </button>
+            </div>
           {:else if $panelState.activeView === "git"}
             <p class="text-xs text-[var(--text-subtle)]">
               Open a Git workspace to see branch and changed files.
@@ -719,51 +767,55 @@
             </button>
           </div>
 
-          <div
-            class="h-[calc(100%-2.25rem)] p-3 font-mono text-xs text-[var(--text-muted)]"
-          >
-            {#if $panelState.bottomView === "terminal"}
-              <p>$ terminal backend will attach here</p>
-            {:else if $panelState.bottomView === "problems"}
-              <p>No problems detected.</p>
-            {:else}
-              <div class="space-y-2">
-                <p>Workspace events and command output will appear here.</p>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
-                    onclick={saveAllDocuments}
-                  >
-                    Save all
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
-                    onclick={() =>
-                      $activeTab &&
-                      closeOtherTabsWithConfirmation($activeTab.id)}
-                  >
-                    Close other tabs
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
-                    onclick={closeAllTabsWithConfirmation}
-                  >
-                    Close all tabs
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
-                    onclick={reopenRecentlyClosedTab}
-                  >
-                    Reopen closed tab
-                  </button>
+          {#if $panelState.bottomView === "terminal"}
+            <div class="h-[calc(100%-2.25rem)] min-h-0">
+              <TerminalPanel cwd={$workspace.rootPath} />
+            </div>
+          {:else}
+            <div
+              class="h-[calc(100%-2.25rem)] p-3 font-mono text-xs text-[var(--text-muted)]"
+            >
+              {#if $panelState.bottomView === "problems"}
+                <p>No problems detected.</p>
+              {:else}
+                <div class="space-y-2">
+                  <p>Workspace events and command output will appear here.</p>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                      onclick={saveAllDocuments}
+                    >
+                      Save all
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                      onclick={() =>
+                        $activeTab &&
+                        closeOtherTabsWithConfirmation($activeTab.id)}
+                    >
+                      Close other tabs
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                      onclick={closeAllTabsWithConfirmation}
+                    >
+                      Close all tabs
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
+                      onclick={reopenRecentlyClosedTab}
+                    >
+                      Reopen closed tab
+                    </button>
+                  </div>
                 </div>
-              </div>
-            {/if}
-          </div>
+              {/if}
+            </div>
+          {/if}
         </section>
       {/if}
     </section>

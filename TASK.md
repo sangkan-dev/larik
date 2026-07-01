@@ -214,28 +214,28 @@
 
 ### 5.1 Terminal UI
 
-- [ ] Install xterm.js.
-- [ ] Render terminal di bottom panel.
-- [ ] Fit terminal size.
-- [ ] Support terminal resize.
-- [ ] Support terminal focus/blur.
+- [x] Install xterm.js.
+- [x] Render terminal di bottom panel.
+- [x] Fit terminal size.
+- [x] Support terminal resize.
+- [x] Support terminal focus/blur.
 
 ### 5.2 Rust PTY Backend
 
-- [ ] Implement spawn shell.
-- [ ] Stream stdout/stderr ke frontend.
-- [ ] Kirim keyboard input ke process.
-- [ ] Resize PTY.
-- [ ] Kill terminal process.
-- [ ] Support multiple terminal sessions.
+- [x] Implement spawn shell.
+- [x] Stream stdout/stderr ke frontend.
+- [x] Kirim keyboard input ke process.
+- [x] Resize PTY.
+- [x] Kill terminal process.
+- [x] Support multiple terminal sessions.
 
 ### 5.3 Terminal Commands
 
-- [ ] Run command di workspace root.
-- [ ] Buat terminal dari project action.
-- [ ] Tampilkan command label.
-- [ ] Auto-scroll output.
-- [ ] Basic copy/paste.
+- [x] Run command di workspace root.
+- [x] Buat terminal dari project action.
+- [x] Tampilkan command label.
+- [x] Auto-scroll output.
+- [x] Basic copy/paste.
 
 ---
 

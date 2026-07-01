@@ -3,6 +3,7 @@ use tauri::{
     Manager,
 };
 
+mod terminal;
 mod workspace;
 
 const MENU_QUIT: &str = "app_quit";
@@ -25,6 +26,7 @@ pub fn run() {
 
     builder
         .manage(workspace::WorkspaceWatcher(Default::default()))
+        .manage(terminal::TerminalState(Default::default()))
         .setup(|app| {
             let handle = app.handle();
             let reload = MenuItemBuilder::with_id(MENU_RELOAD, "Reload Window")
@@ -64,6 +66,10 @@ pub fn run() {
             workspace::rename_workspace_entry,
             workspace::delete_workspace_entry,
             workspace::start_workspace_watch,
+            terminal::terminal_spawn,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_kill,
         ])
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_QUIT => app.exit(0),
