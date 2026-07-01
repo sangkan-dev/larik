@@ -3,6 +3,8 @@ use tauri::{
     Manager,
 };
 
+mod workspace;
+
 const MENU_QUIT: &str = "app_quit";
 const MENU_RELOAD: &str = "app_reload";
 const MENU_DEVTOOLS: &str = "app_devtools";
@@ -11,6 +13,7 @@ const MENU_DEVTOOLS: &str = "app_devtools";
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::default().build());
 
     #[cfg(debug_assertions)]
@@ -21,6 +24,7 @@ pub fn run() {
     );
 
     builder
+        .manage(workspace::WorkspaceWatcher(Default::default()))
         .setup(|app| {
             let handle = app.handle();
             let reload = MenuItemBuilder::with_id(MENU_RELOAD, "Reload Window")
@@ -51,6 +55,16 @@ pub fn run() {
             app.set_menu(menu)?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            workspace::list_workspace_tree,
+            workspace::read_workspace_file,
+            workspace::write_workspace_file,
+            workspace::create_workspace_file,
+            workspace::create_workspace_folder,
+            workspace::rename_workspace_entry,
+            workspace::delete_workspace_entry,
+            workspace::start_workspace_watch,
+        ])
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_QUIT => app.exit(0),
             MENU_RELOAD => {

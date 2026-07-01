@@ -88,46 +88,46 @@
 
 ### 2.1 Open Folder
 
-- [ ] Tambahkan command `Open Folder`.
-- [ ] Buka native folder picker via Tauri.
-- [ ] Simpan folder sebagai workspace aktif.
-- [ ] Simpan daftar recent workspaces.
-- [ ] Render nama folder di status bar/window title.
+- [x] Tambahkan command `Open Folder`.
+- [x] Buka native folder picker via Tauri.
+- [x] Simpan folder sebagai workspace aktif.
+- [x] Simpan daftar recent workspaces.
+- [x] Render nama folder di status bar/window title.
 
 ### 2.2 File Explorer
 
-- [ ] Load file tree dari workspace.
-- [ ] Ignore folder berat:
-  - [ ] `.git`
-  - [ ] `node_modules`
-  - [ ] `vendor`
-  - [ ] `target`
-  - [ ] `dist`
-  - [ ] `build`
-- [ ] Expand/collapse folder.
-- [ ] Open file dari explorer.
-- [ ] Refresh explorer.
-- [ ] Buat file baru.
-- [ ] Buat folder baru.
-- [ ] Rename file/folder.
-- [ ] Delete file/folder dengan konfirmasi.
+- [x] Load file tree dari workspace.
+- [x] Ignore folder berat:
+  - [x] `.git`
+  - [x] `node_modules`
+  - [x] `vendor`
+  - [x] `target`
+  - [x] `dist`
+  - [x] `build`
+- [x] Expand/collapse folder.
+- [x] Open file dari explorer.
+- [x] Refresh explorer.
+- [x] Buat file baru.
+- [x] Buat folder baru.
+- [x] Rename file/folder.
+- [x] Delete file/folder dengan konfirmasi.
 
 ### 2.3 File Editing
 
-- [ ] Read file content via Rust command.
-- [ ] Tampilkan file di editor.
-- [ ] Save file.
-- [ ] Track dirty state.
-- [ ] Prevent close tab jika file belum disimpan.
-- [ ] Support binary/large file guard.
-- [ ] Tampilkan pesan untuk file yang terlalu besar.
+- [x] Read file content via Rust command.
+- [x] Tampilkan file di editor.
+- [x] Save file.
+- [x] Track dirty state.
+- [x] Prevent close tab jika file belum disimpan.
+- [x] Support binary/large file guard.
+- [x] Tampilkan pesan untuk file yang terlalu besar.
 
 ### 2.4 File Watcher
 
-- [ ] Watch perubahan file workspace.
-- [ ] Update explorer ketika file berubah.
-- [ ] Deteksi file yang berubah di disk saat sedang dibuka.
-- [ ] Tampilkan pilihan reload/keep local.
+- [x] Watch perubahan file workspace.
+- [x] Update explorer ketika file berubah.
+- [x] Deteksi file yang berubah di disk saat sedang dibuka.
+- [x] Tampilkan pilihan reload/keep local.
 
 ---
 
