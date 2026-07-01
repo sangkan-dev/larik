@@ -55,32 +55,32 @@
 
 ### 1.1 Tauri Window
 
-- [ ] App bisa booting.
-- [ ] Window title memakai `Larik`.
-- [ ] Default window size nyaman untuk coding.
-- [ ] Persist window size dan position.
-- [ ] Tambahkan menu dasar.
-- [ ] Tambahkan shortcut quit/reload/devtools untuk dev build.
+- [x] App bisa booting.
+- [x] Window title memakai `Larik`.
+- [x] Default window size nyaman untuk coding.
+- [x] Persist window size dan position.
+- [x] Tambahkan menu dasar.
+- [x] Tambahkan shortcut quit/reload/devtools untuk dev build.
 
 ### 1.2 Layout Dasar
 
-- [ ] Buat layout utama:
-  - [ ] activity bar / left rail minimal;
-  - [ ] sidebar explorer;
-  - [ ] editor area;
-  - [ ] bottom panel;
-  - [ ] status bar.
-- [ ] Tambahkan resizable panels.
-- [ ] Tambahkan collapse/expand sidebar.
-- [ ] Tambahkan collapse/expand bottom panel.
+- [x] Buat layout utama:
+  - [x] activity bar / left rail minimal;
+  - [x] sidebar explorer;
+  - [x] editor area;
+  - [x] bottom panel;
+  - [x] status bar.
+- [x] Tambahkan resizable panels.
+- [x] Tambahkan collapse/expand sidebar.
+- [x] Tambahkan collapse/expand bottom panel.
 
 ### 1.3 State UI
 
-- [ ] Buat store workspace aktif.
-- [ ] Buat store tabs terbuka.
-- [ ] Buat store active file.
-- [ ] Buat store panel visibility.
-- [ ] Simpan UI state lokal.
+- [x] Buat store workspace aktif.
+- [x] Buat store tabs terbuka.
+- [x] Buat store active file.
+- [x] Buat store panel visibility.
+- [x] Simpan UI state lokal.
 
 ---
 
