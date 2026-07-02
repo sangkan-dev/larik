@@ -1,5 +1,6 @@
 import { browser } from "$app/environment";
 import { derived, get, writable } from "svelte/store";
+import { clearGitStatus, refreshGitStatus } from "$lib/stores/git";
 import {
   createWorkspaceFile,
   createWorkspaceFolder,
@@ -261,6 +262,7 @@ export function resetShellState() {
   documents.set({});
   recentlyClosedTabs.set([]);
   diskChange.set(null);
+  clearGitStatus();
   panelState.set(defaultPanelState);
   editorPreferences.set(defaultEditorPreferences);
 }
@@ -274,10 +276,12 @@ export async function initializeWorkspace() {
   await setWindowWorkspaceTitle(activeWorkspace.name);
 
   if (!activeWorkspace.rootPath) {
+    clearGitStatus();
     return;
   }
 
   await reloadFileTree();
+  await refreshGitStatus(activeWorkspace.rootPath);
   await startWorkspaceWatch(activeWorkspace.rootPath);
 }
 
@@ -308,6 +312,7 @@ export async function openWorkspace(path?: string) {
   expandedFolders.set([selectedPath]);
   await setWindowWorkspaceTitle(nextWorkspace.name);
   await reloadFileTree();
+  await refreshGitStatus(selectedPath);
   await startWorkspaceWatch(selectedPath);
 }
 
@@ -403,6 +408,7 @@ export async function saveActiveDocument() {
   }
 
   await writeWorkspaceFile(rootPath, document.path, document.content);
+  await refreshGitStatus(rootPath);
   documents.update((currentDocuments) => ({
     ...currentDocuments,
     [document.path]: {
@@ -430,6 +436,7 @@ export async function saveAllDocuments() {
 
   for (const document of openDocuments) {
     await writeWorkspaceFile(rootPath, document.path, document.content);
+    await refreshGitStatus(rootPath);
     documents.update((currentDocuments) => ({
       ...currentDocuments,
       [document.path]: {
@@ -601,6 +608,7 @@ export async function createEntry(
   }
 
   await reloadFileTree();
+  await refreshGitStatus(rootPath);
 }
 
 export async function renameEntry(path: string, newName: string) {
@@ -612,6 +620,7 @@ export async function renameEntry(path: string, newName: string) {
 
   await renameWorkspaceEntry(rootPath, path, newName);
   await reloadFileTree();
+  await refreshGitStatus(rootPath);
 }
 
 export async function deleteEntry(path: string) {
@@ -640,6 +649,7 @@ export async function deleteEntry(path: string) {
   }
   activeFile.set(get(tabs)[0]?.id ?? null);
   await reloadFileTree();
+  await refreshGitStatus(rootPath);
 }
 
 export async function reloadDiskChangedDocument() {
@@ -685,6 +695,10 @@ export async function registerWorkspaceWatcher() {
 
   await onWorkspaceChanged(async (event) => {
     await reloadFileTree();
+    const rootPath = get(workspace).rootPath;
+    if (rootPath) {
+      await refreshGitStatus(rootPath);
+    }
 
     const openDocuments = get(documents);
     const changedPath = event.paths.find((path) => openDocuments[path]);

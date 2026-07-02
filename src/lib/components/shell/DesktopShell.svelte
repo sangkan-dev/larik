@@ -15,7 +15,9 @@
   } from "$lib/commands/registry";
   import type { MonacoEditorController } from "$lib/editor/types";
   import type { FuzzySearchItem } from "$lib/search/fuzzy";
+  import type { GitChangedFile } from "$lib/services/git";
   import type { ProjectAction } from "$lib/services/projectDetector";
+  import { gitState, refreshGitStatus, selectGitFile } from "$lib/stores/git";
   import {
     clearProjectDetection,
     markProjectActionFailed,
@@ -301,6 +303,63 @@
 
   function selectQuickOpenFile(item: FuzzySearchItem) {
     openFile(item.id);
+  }
+
+  function refreshGitPanel() {
+    if ($workspace.rootPath) {
+      refreshGitStatus($workspace.rootPath);
+    }
+  }
+
+  function gitIndicatorLabel() {
+    if (!$workspace.rootPath) {
+      return "No Git";
+    }
+    if ($gitState.loading) {
+      return "Git scanning";
+    }
+    if ($gitState.error) {
+      return "Git error";
+    }
+    if (!$gitState.status?.isRepo) {
+      return "No Git repo";
+    }
+
+    const branch = $gitState.status.branch ?? "detached";
+    const count = $gitState.status.changedFiles.length;
+    const sync =
+      $gitState.status.ahead > 0 || $gitState.status.behind > 0
+        ? ` +${$gitState.status.ahead}/-${$gitState.status.behind}`
+        : "";
+
+    return `${branch}${sync} · ${count}`;
+  }
+
+  function gitFileBadge(file: GitChangedFile) {
+    if (file.untracked) {
+      return "untracked";
+    }
+    if (file.staged && file.unstaged) {
+      return "staged + unstaged";
+    }
+    if (file.staged) {
+      return "staged";
+    }
+    if (file.unstaged) {
+      return "unstaged";
+    }
+
+    return file.kind;
+  }
+
+  function canOpenGitFile(file: GitChangedFile) {
+    return file.kind !== "deleted";
+  }
+
+  function openGitFile(file: GitChangedFile) {
+    if (canOpenGitFile(file)) {
+      openFile(file.absolutePath);
+    }
   }
 
   async function createWorkspaceTerminal() {
@@ -774,9 +833,126 @@
               </button>
             </div>
           {:else if $panelState.activeView === "git"}
-            <p class="text-xs text-[var(--text-subtle)]">
-              Open a Git workspace to see branch and changed files.
-            </p>
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <p class="text-xs font-medium text-[var(--text-muted)]">Git</p>
+              <button
+                type="button"
+                class="grid size-7 place-items-center rounded text-xs text-[var(--text-subtle)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
+                title="Refresh Git status"
+                aria-label="Refresh Git status"
+                onclick={refreshGitPanel}
+              >
+                ↻
+              </button>
+            </div>
+
+            {#if !$workspace.rootPath}
+              <p class="text-xs text-[var(--text-subtle)]">
+                Open a workspace to inspect Git status.
+              </p>
+            {:else if $gitState.loading}
+              <p class="text-xs text-[var(--text-subtle)]">
+                Reading Git status...
+              </p>
+            {:else if $gitState.error}
+              <p class="text-xs text-[var(--danger)]">{$gitState.error}</p>
+            {:else if !$gitState.status?.isRepo}
+              <p class="text-xs text-[var(--text-subtle)]">
+                This workspace is not a Git repository.
+              </p>
+            {:else}
+              <div
+                class="mb-4 rounded-md border border-[var(--border-muted)] bg-[var(--background)] p-2"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <p class="truncate text-sm text-[var(--text)]">
+                    {$gitState.status.branch ?? "detached"}
+                  </p>
+                  <span class="text-xs text-[var(--text-subtle)]">
+                    {$gitState.status.changedFiles.length} changed
+                  </span>
+                </div>
+                {#if $gitState.status.upstream}
+                  <p class="mt-1 truncate text-xs text-[var(--text-muted)]">
+                    {$gitState.status.upstream}
+                    {#if $gitState.status.ahead > 0 || $gitState.status.behind > 0}
+                      · ahead {$gitState.status.ahead} / behind
+                      {$gitState.status.behind}
+                    {/if}
+                  </p>
+                {/if}
+              </div>
+
+              {#if $gitState.status.changedFiles.length > 0}
+                <div class="mb-4 space-y-1">
+                  <p class="text-xs font-medium text-[var(--text-muted)]">
+                    Changed Files
+                  </p>
+                  {#each $gitState.status.changedFiles as file}
+                    <button
+                      type="button"
+                      class={`w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--surface-muted)] ${$gitState.selectedFile?.path === file.path ? "bg-[var(--surface-muted)]" : ""}`}
+                      title={file.path}
+                      onclick={() => selectGitFile(file)}
+                      ondblclick={() => openGitFile(file)}
+                    >
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="min-w-0 flex-1 truncate text-sm text-[var(--text-muted)]"
+                        >
+                          {file.path}
+                        </span>
+                        <span
+                          class="shrink-0 text-xs text-[var(--text-subtle)]"
+                        >
+                          {file.kind}
+                        </span>
+                      </div>
+                      <p
+                        class="mt-0.5 truncate text-xs text-[var(--text-subtle)]"
+                      >
+                        {gitFileBadge(file)} · {file.indexStatus}{file.worktreeStatus}
+                      </p>
+                    </button>
+                  {/each}
+                </div>
+
+                {#if $gitState.selectedFile}
+                  <div
+                    class="space-y-2 border-t border-[var(--border-muted)] pt-3"
+                  >
+                    <p class="text-xs font-medium text-[var(--text-muted)]">
+                      Diff Preview
+                    </p>
+                    <div
+                      class="rounded-md border border-dashed border-[var(--border)] bg-[var(--background)] p-2"
+                    >
+                      <p class="truncate text-xs text-[var(--text-muted)]">
+                        {$gitState.selectedFile.path}
+                      </p>
+                      <p class="mt-1 text-xs text-[var(--text-subtle)]">
+                        Inline diff view will be added after the v0 status
+                        panel.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="h-8 w-full rounded-md px-2 text-left text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={!canOpenGitFile($gitState.selectedFile)}
+                      onclick={() =>
+                        $gitState.selectedFile &&
+                        openGitFile($gitState.selectedFile)}
+                    >
+                      Open file
+                    </button>
+                  </div>
+                {/if}
+              {:else}
+                <p class="text-xs text-[var(--text-subtle)]">
+                  Working tree clean.
+                </p>
+              {/if}
+            {/if}
           {:else}
             <p class="text-xs text-[var(--text-subtle)]">
               Workspace search will be available after indexing.
@@ -1089,6 +1265,13 @@
       {/if}
     </div>
     <div class="flex items-center gap-4">
+      <button
+        class="hover:text-[var(--text)]"
+        type="button"
+        onclick={() => setActiveView("git")}
+      >
+        {gitIndicatorLabel()}
+      </button>
       <button
         class="hover:text-[var(--text)]"
         type="button"

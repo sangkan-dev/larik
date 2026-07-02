@@ -350,17 +350,17 @@
 
 ### 8.1 Git Detection
 
-- [ ] Deteksi apakah workspace adalah Git repo.
-- [ ] Ambil branch aktif.
-- [ ] Ambil status file berubah.
-- [ ] Tampilkan indikator di status bar.
+- [x] Deteksi apakah workspace adalah Git repo.
+- [x] Ambil branch aktif.
+- [x] Ambil status file berubah.
+- [x] Tampilkan indikator di status bar.
 
 ### 8.2 Git Panel
 
-- [ ] Tampilkan changed files.
-- [ ] Tampilkan staged/unstaged basic.
-- [ ] Open changed file.
-- [ ] Basic diff view placeholder.
+- [x] Tampilkan changed files.
+- [x] Tampilkan staged/unstaged basic.
+- [x] Open changed file.
+- [x] Basic diff view placeholder.
 
 ### 8.3 Future Git Tasks
 

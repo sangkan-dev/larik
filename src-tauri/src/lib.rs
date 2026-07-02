@@ -3,6 +3,7 @@ use tauri::{
     Manager,
 };
 
+mod git;
 mod project_detector;
 mod terminal;
 mod workspace;
@@ -68,6 +69,7 @@ pub fn run() {
             workspace::delete_workspace_entry,
             workspace::start_workspace_watch,
             project_detector::detect_project,
+            git::git_status,
             terminal::terminal_spawn,
             terminal::terminal_write,
             terminal::terminal_resize,
