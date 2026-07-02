@@ -59,6 +59,7 @@ export type FileTreeState = {
   entries: FileTreeEntry[];
   loading: boolean;
   error: string | null;
+  version: number;
 };
 
 export type DiskChangeState = {
@@ -104,6 +105,8 @@ const defaultEditorPreferences: EditorPreferenceState = {
   minimap: false,
   wordWrap: false,
 };
+
+let fileTreeLoadId = 0;
 
 function createPersistedStore<T>(key: string, initialValue: T) {
   const storedValue = browser ? localStorage.getItem(key) : null;
@@ -177,6 +180,7 @@ export const fileTree = writable<FileTreeState>({
   entries: [],
   loading: false,
   error: null,
+  version: 0,
 });
 export const expandedFolders = createPersistedStore<string[]>(
   "larik.workspace.expandedFolders",
@@ -257,7 +261,7 @@ export function resetShellState() {
   workspace.set(defaultWorkspace);
   tabs.set(defaultTabs);
   activeFile.set(defaultTabs[0]?.id ?? null);
-  fileTree.set({ entries: [], loading: false, error: null });
+  fileTree.set({ entries: [], loading: false, error: null, version: 0 });
   expandedFolders.set([]);
   documents.set({});
   recentlyClosedTabs.set([]);
@@ -280,9 +284,13 @@ export async function initializeWorkspace() {
     return;
   }
 
-  await reloadFileTree();
-  await refreshGitStatus(activeWorkspace.rootPath);
-  await startWorkspaceWatch(activeWorkspace.rootPath);
+  const rootPath = activeWorkspace.rootPath;
+  expandedFolders.update((folders) =>
+    folders.includes(rootPath) ? folders : [rootPath, ...folders],
+  );
+  await reloadFileTree(rootPath);
+  await refreshGitStatus(rootPath);
+  await startWorkspaceWatch(rootPath);
 }
 
 export async function openWorkspace(path?: string) {
@@ -309,32 +317,58 @@ export async function openWorkspace(path?: string) {
   documents.set({});
   recentlyClosedTabs.set([]);
   diskChange.set(null);
+  clearGitStatus();
+  fileTree.set({ entries: [], loading: true, error: null, version: 0 });
   expandedFolders.set([selectedPath]);
   await setWindowWorkspaceTitle(nextWorkspace.name);
-  await reloadFileTree();
+  await reloadFileTree(selectedPath);
   await refreshGitStatus(selectedPath);
   await startWorkspaceWatch(selectedPath);
 }
 
-export async function reloadFileTree() {
-  const rootPath = get(workspace).rootPath;
+export async function reloadFileTree(rootPathOverride?: string) {
+  const rootPath = rootPathOverride ?? get(workspace).rootPath;
 
   if (!rootPath) {
-    fileTree.set({ entries: [], loading: false, error: null });
+    fileTree.update((state) => ({
+      entries: [],
+      loading: false,
+      error: null,
+      version: state.version + 1,
+    }));
     return;
   }
 
-  fileTree.set({ entries: get(fileTree).entries, loading: true, error: null });
+  const loadId = fileTreeLoadId + 1;
+  fileTreeLoadId = loadId;
+  fileTree.update((state) => ({
+    entries: state.entries,
+    loading: true,
+    error: null,
+    version: state.version + 1,
+  }));
 
   try {
     const entries = await listWorkspaceTree(rootPath);
-    fileTree.set({ entries, loading: false, error: null });
+    if (loadId !== fileTreeLoadId || get(workspace).rootPath !== rootPath) {
+      return;
+    }
+    fileTree.update((state) => ({
+      entries,
+      loading: false,
+      error: null,
+      version: state.version + 1,
+    }));
   } catch (error) {
-    fileTree.set({
+    if (loadId !== fileTreeLoadId || get(workspace).rootPath !== rootPath) {
+      return;
+    }
+    fileTree.update((state) => ({
       entries: [],
       loading: false,
       error: error instanceof Error ? error.message : String(error),
-    });
+      version: state.version + 1,
+    }));
   }
 }
 
@@ -344,6 +378,7 @@ export function toggleFolder(path: string) {
       ? folders.filter((folder) => folder !== path)
       : [...folders, path],
   );
+  fileTree.update((state) => ({ ...state, version: state.version + 1 }));
 }
 
 export async function openFile(path: string) {
@@ -607,7 +642,7 @@ export async function createEntry(
     await openFile(path);
   }
 
-  await reloadFileTree();
+  await reloadFileTree(rootPath);
   await refreshGitStatus(rootPath);
 }
 
@@ -619,7 +654,7 @@ export async function renameEntry(path: string, newName: string) {
   }
 
   await renameWorkspaceEntry(rootPath, path, newName);
-  await reloadFileTree();
+  await reloadFileTree(rootPath);
   await refreshGitStatus(rootPath);
 }
 
@@ -648,7 +683,7 @@ export async function deleteEntry(path: string) {
     tabs.set(defaultTabs);
   }
   activeFile.set(get(tabs)[0]?.id ?? null);
-  await reloadFileTree();
+  await reloadFileTree(rootPath);
   await refreshGitStatus(rootPath);
 }
 
@@ -694,9 +729,9 @@ export async function registerWorkspaceWatcher() {
   }
 
   await onWorkspaceChanged(async (event) => {
-    await reloadFileTree();
     const rootPath = get(workspace).rootPath;
     if (rootPath) {
+      await reloadFileTree(rootPath);
       await refreshGitStatus(rootPath);
     }
 

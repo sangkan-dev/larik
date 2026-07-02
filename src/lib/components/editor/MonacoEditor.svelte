@@ -57,12 +57,15 @@
   export let theme: "larik-dark" | "larik-light" = "larik-dark";
   export let minimap = false;
   export let wordWrap = false;
+  export let gitDiff: string | null = null;
   export let onChange: (content: string) => void;
   export let onReady: (controller: MonacoEditorController) => void;
 
   let container: HTMLDivElement;
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
   let model: monaco.editor.ITextModel | null = null;
+  let gitDecorationCollection: monaco.editor.IEditorDecorationsCollection | null =
+    null;
   let changeSubscription: monaco.IDisposable | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let currentModelPath: string | null = null;
@@ -100,6 +103,7 @@
       lineHeight: 22,
       minimap: { enabled: minimap },
       padding: { top: 12, bottom: 12 },
+      glyphMargin: true,
       renderLineHighlight: "line",
       scrollBeyondLastLine: false,
       tabSize: 2,
@@ -111,6 +115,10 @@
     attachModel(path, content);
     onReady(createController());
   });
+
+  $: if (editor && gitDecorationCollection) {
+    applyGitDecorations(gitDiff);
+  }
 
   onDestroy(() => {
     changeSubscription?.dispose();
@@ -171,6 +179,7 @@
     monaco.editor.setModelLanguage(model, language);
     editor.setModel(model);
     currentModelPath = nextPath;
+    applyGitDecorations(gitDiff);
     const viewState = viewStates.get(nextPath);
     if (viewState) {
       editor.restoreViewState(viewState);
@@ -218,6 +227,71 @@
       },
     };
   }
+
+  function applyGitDecorations(diff: string | null) {
+    if (!editor || !model) {
+      return;
+    }
+
+    gitDecorationCollection ??= editor.createDecorationsCollection();
+    gitDecorationCollection.set(
+      parseChangedLines(diff).map((lineNumber) => ({
+        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+        options: {
+          isWholeLine: true,
+          className: "larik-git-line",
+          glyphMarginClassName: "larik-git-glyph",
+          glyphMarginHoverMessage: { value: "Changed in Git working tree" },
+        },
+      })),
+    );
+  }
+
+  function parseChangedLines(diff: string | null) {
+    if (!diff) {
+      return [];
+    }
+
+    const changedLines = new Set<number>();
+    let nextLine = 0;
+
+    for (const line of diff.split("\n")) {
+      const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+      if (hunk) {
+        nextLine = Number(hunk[1]);
+        continue;
+      }
+      if (nextLine === 0 || line.startsWith("\\ No newline")) {
+        continue;
+      }
+      if (line.startsWith("+")) {
+        changedLines.add(nextLine);
+        nextLine += 1;
+        continue;
+      }
+      if (line.startsWith("-")) {
+        changedLines.add(Math.max(nextLine, 1));
+        continue;
+      }
+      if (line.startsWith(" ")) {
+        nextLine += 1;
+      }
+    }
+
+    return [...changedLines];
+  }
 </script>
 
 <div bind:this={container} class="min-h-0 flex-1"></div>
+
+<style>
+  :global(.larik-git-line) {
+    background: color-mix(in srgb, var(--success) 12%, transparent);
+  }
+
+  :global(.larik-git-glyph) {
+    background: var(--success);
+    margin-left: 4px;
+    width: 3px !important;
+  }
+</style>

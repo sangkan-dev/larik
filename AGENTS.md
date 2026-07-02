@@ -172,6 +172,18 @@ Larik should feel:
 
 Avoid UI patterns that require users to configure many things before coding.
 
+For common code-editor workflows, prefer familiar interaction models. Larik is not a VS Code clone and must not chase full VS Code extension compatibility, but basic workflows should preserve developer muscle memory unless there is a clear product reason to differ.
+
+Use familiar defaults for:
+
+- Explorer: dense file tree, nested folders, immediate expand/collapse, automatic refresh after open/create/rename/delete.
+- Git/source control: repository summary, staged changes, unstaged changes, untracked files, diff view, gutter indicators, explicit stage/unstage/commit actions.
+- Editor tabs: active/dirty/close states.
+- Command palette and quick open: keyboard-first searchable lists.
+- Terminal: explicit new/run/copy/paste/kill controls, no automatic command execution.
+
+Improve where Larik has a clear advantage: project-aware actions, safer local-first guardrails, clearer empty/error states, and simpler defaults. Do not make core interactions different just to look unique.
+
 Default first-run experience:
 
 ```txt

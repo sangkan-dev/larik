@@ -48,6 +48,27 @@ Versi Indonesia:
 - Tidak membuat layout yang terlalu berbeda dari kebiasaan developer sampai membingungkan.
 - Tidak meniru 1:1 VS Code, walaupun beberapa pola UX boleh familiar.
 
+### 2.3 Familiar by Default
+
+Untuk workflow inti code editor, Larik harus familiar by default. User tidak boleh merasa harus belajar ulang untuk hal dasar seperti membuka folder, expand tree, memilih changed file, membaca diff, stage/unstage, commit, quick open, command palette, dan terminal.
+
+Prinsipnya:
+
+```txt
+Familiar interaction first.
+Improve where Larik has a clear product advantage.
+Avoid novelty for novelty's sake.
+```
+
+Rules:
+
+- Explorer harus terasa seperti file tree code editor modern: dense, nested, langsung update, dan bisa dibuka tanpa refresh manual.
+- Git/source control harus memakai pola umum: staged, changes, untracked, diff view, gutter indicator, branch/status summary.
+- Klik item Git harus menampilkan diff atau membuka file sesuai ekspektasi umum.
+- Panel boleh minimal, tetapi tidak boleh menghilangkan affordance yang sudah menjadi muscle memory developer.
+- Inovasi Larik sebaiknya muncul di project-awareness, action suggestions, local-first guardrail, dan copywriting yang lebih membumi.
+- Jika sebuah UI berbeda dari pola umum, alasannya harus jelas: lebih cepat, lebih aman, lebih ringan, atau lebih mudah dipahami.
+
 ---
 
 ## 3. Brand Foundation
@@ -490,6 +511,34 @@ Rules:
 - Indentation jelas.
 - Icon jangan terlalu warna-warni di default theme.
 - Modified file bisa pakai text warning atau dot kecil.
+- Folder expand/collapse harus langsung terlihat tanpa refresh manual.
+- Tree tidak boleh diganti menjadi card/list besar untuk data hierarkis seperti file dan Git paths.
+```
+
+### 9.4.1 Source Control Tree
+
+Git/source control panel harus terasa dekat dengan pola source control code editor umum.
+
+Structure:
+
+```txt
+Repository summary
+Commit message
+Staged Changes
+Changes
+Untracked
+```
+
+Rules:
+
+```txt
+- Changed files ditampilkan sebagai path tree, bukan card.
+- Aksi stage/unstage boleh compact dan muncul pada hover/active.
+- Klik single file menampilkan diff di area utama atau panel diff yang cukup luas.
+- Double click/open file membuka working file jika file masih ada.
+- Diff harus membedakan added, removed, hunk header, dan context line.
+- Untracked file punya empty/help state yang jelas jika belum ada diff.
+- Destructive Git action tidak boleh tersedia tanpa konfirmasi eksplisit.
 ```
 
 ### 9.5 Command Palette
@@ -833,6 +882,20 @@ Rules:
 - AI tidak boleh mengirim seluruh workspace otomatis.
 - AI tidak boleh auto-apply perubahan tanpa review.
 ```
+
+### 14.4 Familiar Workflow Rule
+
+Ketika membuat fitur yang sudah umum di code editor lain, mulai dari ekspektasi user yang sudah terbentuk:
+
+```txt
+Explorer -> tree, expand/collapse, open file, create/rename/delete.
+Git      -> staged/changes/untracked, diff, gutter, stage/unstage/commit.
+Search   -> query, result list, file path, jump to line.
+Terminal -> explicit new/run/copy/paste/kill.
+Tabs     -> active/dirty/close, predictable switching.
+```
+
+Larik boleh menyederhanakan, tetapi jangan mengubah bentuk dasar workflow sampai user kehilangan muscle memory. Perbaikan yang diutamakan adalah mengurangi friksi, memberi konteks project, memperjelas risiko, dan membuat state otomatis ter-update.
 
 ---
 

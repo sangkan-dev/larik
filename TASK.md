@@ -364,12 +364,12 @@
 
 ### 8.3 Future Git Tasks
 
-- [ ] Stage file.
-- [ ] Unstage file.
-- [ ] Commit.
-- [ ] Generate commit message dengan AI optional.
-- [ ] View diff inline.
-- [ ] Git gutter.
+- [x] Stage file.
+- [x] Unstage file.
+- [x] Commit.
+- [x] Generate commit message dengan AI optional.
+- [x] View diff inline.
+- [x] Git gutter.
 
 ---
 

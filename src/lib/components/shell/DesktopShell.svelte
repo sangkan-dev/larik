@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import CommandLauncher from "$lib/components/command/CommandLauncher.svelte";
   import MonacoEditor from "$lib/components/editor/MonacoEditor.svelte";
+  import GitChangeTree from "$lib/components/git/GitChangeTree.svelte";
+  import GitDiffView from "$lib/components/git/GitDiffView.svelte";
   import TerminalPanel from "$lib/components/terminal/TerminalPanel.svelte";
   import FileTree from "$lib/components/workspace/FileTree.svelte";
   import {
@@ -15,9 +17,20 @@
   } from "$lib/commands/registry";
   import type { MonacoEditorController } from "$lib/editor/types";
   import type { FuzzySearchItem } from "$lib/search/fuzzy";
+  import { getGitDiff } from "$lib/services/git";
   import type { GitChangedFile } from "$lib/services/git";
   import type { ProjectAction } from "$lib/services/projectDetector";
-  import { gitState, refreshGitStatus, selectGitFile } from "$lib/stores/git";
+  import {
+    commitChanges,
+    generateCommitMessage,
+    gitState,
+    loadGitDiff,
+    refreshGitStatus,
+    selectGitFile,
+    setCommitMessage,
+    stageFile,
+    unstageFile,
+  } from "$lib/stores/git";
   import {
     clearProjectDetection,
     markProjectActionFailed,
@@ -87,6 +100,9 @@
   let commandPaletteOpen = false;
   let quickOpenOpen = false;
   let detectedRootPath: string | null = null;
+  let syncedRootPath: string | null = null;
+  let gitGutterDiff: string | null = null;
+  let gitGutterKey: string | null = null;
 
   $: commandRegistry = createCommandRegistry(
     baseCommandMetadata.map((command) => ({
@@ -101,6 +117,12 @@
     shortcut: command.shortcut,
   }));
   $: quickOpenItems = indexWorkspaceFiles($fileTree.entries);
+  $: if ($workspace.rootPath && $workspace.rootPath !== syncedRootPath) {
+    syncedRootPath = $workspace.rootPath;
+    syncWorkspaceViews($workspace.rootPath);
+  } else if (!$workspace.rootPath && syncedRootPath) {
+    syncedRootPath = null;
+  }
   $: if ($workspace.rootPath && $workspace.rootPath !== detectedRootPath) {
     detectedRootPath = $workspace.rootPath;
     scanProject($workspace.rootPath);
@@ -108,6 +130,27 @@
     detectedRootPath = null;
     clearProjectDetection();
   }
+  $: activeGitFile =
+    $activeDocument && $gitState.status?.isRepo
+      ? ($gitState.status.changedFiles.find(
+          (file) => file.absolutePath === $activeDocument?.path,
+        ) ?? null)
+      : null;
+  $: nextGitGutterKey = activeGitFile
+    ? `${activeGitFile.path}:${activeGitFile.indexStatus}${activeGitFile.worktreeStatus}:${$activeDocument?.path}`
+    : null;
+  $: if (
+    $workspace.rootPath &&
+    activeGitFile &&
+    nextGitGutterKey !== gitGutterKey
+  ) {
+    gitGutterKey = nextGitGutterKey;
+    loadActiveGitGutter($workspace.rootPath, activeGitFile);
+  } else if (!activeGitFile && gitGutterKey) {
+    gitGutterKey = null;
+    gitGutterDiff = null;
+  }
+  $: activeGitDiffView = activeGitDiff();
 
   onMount(() => {
     initializeWorkspace();
@@ -305,9 +348,44 @@
     openFile(item.id);
   }
 
+  async function syncWorkspaceViews(rootPath: string) {
+    await tick();
+    await Promise.all([reloadFileTree(rootPath), refreshGitStatus(rootPath)]);
+  }
+
+  function selectShellView(view: ShellView) {
+    setActiveView(view);
+    if (!$workspace.rootPath) {
+      return;
+    }
+    if (view === "git") {
+      refreshGitStatus($workspace.rootPath);
+    }
+    if (view === "explorer" && $fileTree.entries.length === 0) {
+      reloadFileTree($workspace.rootPath);
+    }
+  }
+
   function refreshGitPanel() {
     if ($workspace.rootPath) {
       refreshGitStatus($workspace.rootPath);
+    }
+  }
+
+  async function loadActiveGitGutter(rootPath: string, file: GitChangedFile) {
+    try {
+      const diff = await getGitDiff(
+        rootPath,
+        file.path,
+        file.staged && !file.unstaged,
+      );
+      if (gitGutterKey?.startsWith(`${file.path}:`)) {
+        gitGutterDiff = diff.content;
+      }
+    } catch {
+      if (gitGutterKey?.startsWith(`${file.path}:`)) {
+        gitGutterDiff = null;
+      }
     }
   }
 
@@ -359,6 +437,87 @@
   function openGitFile(file: GitChangedFile) {
     if (canOpenGitFile(file)) {
       openFile(file.absolutePath);
+    }
+  }
+
+  function stagedGitFiles() {
+    return $gitState.status?.changedFiles.filter((file) => file.staged) ?? [];
+  }
+
+  function unstagedGitFiles() {
+    return (
+      $gitState.status?.changedFiles.filter(
+        (file) => file.unstaged && !file.untracked,
+      ) ?? []
+    );
+  }
+
+  function untrackedGitFiles() {
+    return (
+      $gitState.status?.changedFiles.filter((file) => file.untracked) ?? []
+    );
+  }
+
+  function selectedGitKey() {
+    if (!$gitState.selectedFile) {
+      return null;
+    }
+    if ($gitState.selectedFile.untracked) {
+      return `${$gitState.selectedFile.path}:worktree`;
+    }
+
+    return `${$gitState.selectedFile.path}:${$gitState.diff?.staged ? "staged" : "worktree"}`;
+  }
+
+  function activeGitDiff() {
+    if ($panelState.activeView !== "git" || !$gitState.selectedFile) {
+      return null;
+    }
+
+    return {
+      file: $gitState.selectedFile,
+      diff: $gitState.diff ?? {
+        path: $gitState.selectedFile.path,
+        staged: false,
+        content: "",
+      },
+    };
+  }
+
+  async function inspectGitFile(file: GitChangedFile, staged?: boolean) {
+    selectGitFile(file);
+    if ($workspace.rootPath && !file.untracked) {
+      await loadGitDiff($workspace.rootPath, file, staged);
+    }
+  }
+
+  function inspectUntrackedGitFile(file: GitChangedFile) {
+    selectGitFile(file);
+  }
+
+  async function stageGitFileFromPanel(file: GitChangedFile) {
+    if ($workspace.rootPath) {
+      await stageFile($workspace.rootPath, file);
+    }
+  }
+
+  async function unstageGitFileFromPanel(file: GitChangedFile) {
+    if ($workspace.rootPath) {
+      await unstageFile($workspace.rootPath, file);
+    }
+  }
+
+  async function commitGitFromPanel() {
+    if (!$workspace.rootPath || !$gitState.commitMessage.trim()) {
+      return;
+    }
+
+    await commitChanges($workspace.rootPath, $gitState.commitMessage);
+  }
+
+  async function generateCommitMessageFromPanel() {
+    if ($workspace.rootPath) {
+      await generateCommitMessage($workspace.rootPath);
     }
   }
 
@@ -529,7 +688,7 @@
           class={`mb-1 grid size-8 place-items-center rounded-md text-xs font-medium ${$panelState.activeView === item.id ? "bg-[var(--accent-muted)] text-[var(--accent-hover)]" : "text-[var(--text-subtle)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"}`}
           aria-label={item.label}
           title={item.label}
-          onclick={() => setActiveView(item.id)}
+          onclick={() => selectShellView(item.id)}
         >
           {item.icon}
         </button>
@@ -620,7 +779,7 @@
                   class="grid size-7 place-items-center rounded text-xs text-[var(--text-subtle)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
                   title="Refresh explorer"
                   aria-label="Refresh explorer"
-                  onclick={reloadFileTree}
+                  onclick={() => reloadFileTree()}
                 >
                   ↻
                 </button>
@@ -651,16 +810,18 @@
               {:else if $fileTree.error}
                 <p class="text-xs text-[var(--danger)]">{$fileTree.error}</p>
               {:else}
-                <FileTree
-                  entries={$fileTree.entries}
-                  expandedFolders={$expandedFolders}
-                  onCreateFile={(path) => createFromPrompt(path, "file")}
-                  onCreateFolder={(path) => createFromPrompt(path, "folder")}
-                  onDelete={deleteWithConfirmation}
-                  onOpenFile={openFile}
-                  onRename={renameFromPrompt}
-                  onToggleFolder={toggleFolder}
-                />
+                {#key `${$workspace.rootPath}:${$fileTree.version}:${$expandedFolders.join("|")}`}
+                  <FileTree
+                    entries={$fileTree.entries}
+                    expandedFolders={$expandedFolders}
+                    onCreateFile={(path) => createFromPrompt(path, "file")}
+                    onCreateFolder={(path) => createFromPrompt(path, "folder")}
+                    onDelete={deleteWithConfirmation}
+                    onOpenFile={openFile}
+                    onRename={renameFromPrompt}
+                    onToggleFolder={toggleFolder}
+                  />
+                {/key}
               {/if}
             {/if}
           {:else if $panelState.activeView === "project"}
@@ -884,67 +1045,92 @@
               </div>
 
               {#if $gitState.status.changedFiles.length > 0}
-                <div class="mb-4 space-y-1">
+                <div class="mb-4 space-y-2">
                   <p class="text-xs font-medium text-[var(--text-muted)]">
-                    Changed Files
+                    Commit
                   </p>
-                  {#each $gitState.status.changedFiles as file}
+                  <textarea
+                    class="min-h-16 w-full resize-none rounded-md border border-[var(--border-muted)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                    placeholder="Commit message"
+                    value={$gitState.commitMessage}
+                    oninput={(event) =>
+                      setCommitMessage(event.currentTarget.value)}></textarea>
+                  <div class="flex gap-1">
                     <button
                       type="button"
-                      class={`w-full rounded-md px-2 py-1.5 text-left hover:bg-[var(--surface-muted)] ${$gitState.selectedFile?.path === file.path ? "bg-[var(--surface-muted)]" : ""}`}
-                      title={file.path}
-                      onclick={() => selectGitFile(file)}
-                      ondblclick={() => openGitFile(file)}
+                      class="h-8 flex-1 rounded-md px-2 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={$gitState.operation !== null}
+                      onclick={generateCommitMessageFromPanel}
                     >
-                      <div class="flex items-center gap-2">
-                        <span
-                          class="min-w-0 flex-1 truncate text-sm text-[var(--text-muted)]"
-                        >
-                          {file.path}
-                        </span>
-                        <span
-                          class="shrink-0 text-xs text-[var(--text-subtle)]"
-                        >
-                          {file.kind}
-                        </span>
-                      </div>
-                      <p
-                        class="mt-0.5 truncate text-xs text-[var(--text-subtle)]"
-                      >
-                        {gitFileBadge(file)} · {file.indexStatus}{file.worktreeStatus}
-                      </p>
+                      Message
                     </button>
-                  {/each}
+                    <button
+                      type="button"
+                      class="h-8 flex-1 rounded-md border border-[var(--border)] px-2 text-sm text-[var(--text)] hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={$gitState.operation !== null ||
+                        !$gitState.commitMessage.trim() ||
+                        stagedGitFiles().length === 0}
+                      onclick={commitGitFromPanel}
+                    >
+                      Commit
+                    </button>
+                  </div>
                 </div>
 
-                {#if $gitState.selectedFile}
-                  <div
-                    class="space-y-2 border-t border-[var(--border-muted)] pt-3"
-                  >
+                {#if stagedGitFiles().length > 0}
+                  <div class="mb-4 space-y-1">
                     <p class="text-xs font-medium text-[var(--text-muted)]">
-                      Diff Preview
+                      Staged
                     </p>
-                    <div
-                      class="rounded-md border border-dashed border-[var(--border)] bg-[var(--background)] p-2"
-                    >
-                      <p class="truncate text-xs text-[var(--text-muted)]">
-                        {$gitState.selectedFile.path}
-                      </p>
-                      <p class="mt-1 text-xs text-[var(--text-subtle)]">
-                        Inline diff view will be added after the v0 status
-                        panel.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      class="h-8 w-full rounded-md px-2 text-left text-sm text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={!canOpenGitFile($gitState.selectedFile)}
-                      onclick={() =>
-                        $gitState.selectedFile &&
-                        openGitFile($gitState.selectedFile)}
-                    >
-                      Open file
-                    </button>
+                    <GitChangeTree
+                      files={stagedGitFiles()}
+                      action="unstage"
+                      inspectStaged={true}
+                      selectedKey={selectedGitKey()}
+                      disabled={$gitState.operation !== null}
+                      onInspect={inspectGitFile}
+                      onOpen={openGitFile}
+                      onStage={stageGitFileFromPanel}
+                      onUnstage={unstageGitFileFromPanel}
+                    />
+                  </div>
+                {/if}
+
+                {#if unstagedGitFiles().length > 0}
+                  <div class="mb-4 space-y-1">
+                    <p class="text-xs font-medium text-[var(--text-muted)]">
+                      Changes
+                    </p>
+                    <GitChangeTree
+                      files={unstagedGitFiles()}
+                      action="stage"
+                      inspectStaged={false}
+                      selectedKey={selectedGitKey()}
+                      disabled={$gitState.operation !== null}
+                      onInspect={inspectGitFile}
+                      onOpen={openGitFile}
+                      onStage={stageGitFileFromPanel}
+                      onUnstage={unstageGitFileFromPanel}
+                    />
+                  </div>
+                {/if}
+
+                {#if untrackedGitFiles().length > 0}
+                  <div class="mb-4 space-y-1">
+                    <p class="text-xs font-medium text-[var(--text-muted)]">
+                      Untracked
+                    </p>
+                    <GitChangeTree
+                      files={untrackedGitFiles()}
+                      action="stage"
+                      inspectStaged={false}
+                      selectedKey={selectedGitKey()}
+                      disabled={$gitState.operation !== null}
+                      onInspect={inspectUntrackedGitFile}
+                      onOpen={openGitFile}
+                      onStage={stageGitFileFromPanel}
+                      onUnstage={unstageGitFileFromPanel}
+                    />
                   </div>
                 {/if}
               {:else}
@@ -1031,7 +1217,14 @@
           </div>
         {/if}
 
-        {#if $activeDocument}
+        {#if activeGitDiffView}
+          <GitDiffView
+            file={activeGitDiffView.file}
+            diff={activeGitDiffView.diff}
+            loading={$gitState.diffLoading}
+            onOpenFile={openGitFile}
+          />
+        {:else if $activeDocument}
           {#if $activeDocument.tooLarge}
             <div
               class="mx-auto flex w-full max-w-2xl flex-col justify-center px-8"
@@ -1123,6 +1316,7 @@
                 theme={$editorPreferences.theme}
                 minimap={$editorPreferences.minimap}
                 wordWrap={$editorPreferences.wordWrap}
+                gitDiff={gitGutterDiff}
                 onChange={updateActiveDocument}
                 onReady={(controller) => {
                   editorController = controller;

@@ -173,6 +173,20 @@ Larik harus tetap berguna tanpa internet:
 
 Kode harus mudah dibaca, struktur modular, dan kontribusi tidak terlalu sulit.
 
+### 5.7 Familiar Workflows, Focused Improvements
+
+Larik tidak perlu membuat pola UX baru untuk workflow yang sudah punya standar kuat di code editor modern. Untuk area seperti Explorer, Git/source control, tabs, command palette, terminal, search, dan diff review, Larik harus memakai model interaksi yang familiar bagi developer.
+
+Tujuannya bukan meniru VS Code 1:1, tetapi menjaga muscle memory user:
+
+- Explorer memakai tree folder/file yang langsung expand/collapse dan update otomatis.
+- Git/source control memakai grouping yang mudah dikenali seperti staged changes, unstaged changes, untracked files, diff view, gutter indicator, stage/unstage/commit.
+- Klik file Git harus membawa user ke diff yang jelas, bukan hanya metadata teknis.
+- Command palette dan quick open harus keyboard-first.
+- Terminal tetap eksplisit: command tidak auto-run tanpa aksi user.
+
+Larik boleh berbeda jika perbedaannya jelas meningkatkan workflow, misalnya memberi project action yang lebih kontekstual, empty state yang lebih membumi, atau guardrail untuk operasi berisiko. Jangan membuat interaksi utama berbeda hanya agar terlihat unik.
+
 ---
 
 ## 6. Non-goals
@@ -188,6 +202,7 @@ Fitur berikut **bukan target awal**:
 - AI agent otomatis yang memodifikasi project tanpa konfirmasi;
 - custom editor core dari nol di fase awal;
 - menggantikan semua fitur VS Code.
+- membuat ulang pola UX dasar yang sudah familiar tanpa alasan produk yang kuat.
 
 ---
 
