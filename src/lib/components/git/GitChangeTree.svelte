@@ -113,6 +113,14 @@
     }
     return "";
   }
+
+  function statusBadge(file: GitChangedFile) {
+    if (file.untracked) return "U";
+    if (file.kind === "added") return "A";
+    if (file.kind === "deleted") return "D";
+    if (file.kind === "renamed") return "R";
+    return "M";
+  }
 </script>
 
 <div class="space-y-0.5">
@@ -146,7 +154,7 @@
             <span
               class="ml-auto shrink-0 text-[10px] text-[var(--text-subtle)]"
             >
-              {row.file.kind}
+              {statusBadge(row.file)}
             </span>
           </button>
 

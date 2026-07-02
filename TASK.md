@@ -377,46 +377,46 @@
 
 ### 9.1 LSP Manager Skeleton
 
-- [ ] Buat module `lsp` di Rust.
-- [ ] Define language server config.
-- [ ] Start language server process.
-- [ ] Stop language server process.
-- [ ] Send initialize request.
-- [ ] Send shutdown request.
-- [ ] Handle JSON-RPC messages.
+- [x] Buat module `lsp` di Rust.
+- [x] Define language server config.
+- [x] Start language server process.
+- [x] Stop language server process.
+- [x] Send initialize request.
+- [x] Send shutdown request.
+- [x] Handle JSON-RPC messages.
 
 ### 9.2 Document Sync
 
-- [ ] Send `textDocument/didOpen`.
-- [ ] Send `textDocument/didChange`.
-- [ ] Send `textDocument/didSave`.
-- [ ] Send `textDocument/didClose`.
+- [x] Send `textDocument/didOpen`.
+- [x] Send `textDocument/didChange`.
+- [x] Send `textDocument/didSave`.
+- [x] Send `textDocument/didClose`.
 
 ### 9.3 Diagnostics
 
-- [ ] Receive diagnostics.
-- [ ] Map diagnostics to file path.
-- [ ] Show diagnostics in Monaco markers.
-- [ ] Create Problems panel.
+- [x] Receive diagnostics.
+- [x] Map diagnostics to file path.
+- [x] Show diagnostics in Monaco markers.
+- [x] Create Problems panel.
 
 ### 9.4 Completion
 
-- [ ] Request completion from LSP.
-- [ ] Map completion items to Monaco completion provider.
+- [x] Request completion from LSP.
+- [x] Map completion items to Monaco completion provider.
 - [ ] Support resolve completion optional.
 
 ### 9.5 Hover & Navigation
 
-- [ ] Hover provider.
-- [ ] Go to definition.
+- [x] Hover provider.
+- [x] Go to definition.
 - [ ] Find references.
 - [ ] Rename symbol.
-- [ ] Document formatting.
+- [x] Document formatting.
 - [ ] Code action.
 
 ### 9.6 Initial Language Targets
 
-- [ ] TypeScript / JavaScript.
+- [x] TypeScript / JavaScript.
 - [ ] Svelte.
 - [ ] PHP.
 - [ ] Rust.
@@ -652,13 +652,13 @@
 
 ### Milestone 0.2 — Language-aware Editor
 
-- [ ] LSP manager basic.
-- [ ] Diagnostics.
-- [ ] Completion.
-- [ ] Hover.
-- [ ] Go to definition.
+- [x] LSP manager basic.
+- [x] Diagnostics.
+- [x] Completion.
+- [x] Hover.
+- [x] Go to definition.
 - [ ] Format on save.
-- [ ] Problems panel.
+- [x] Problems panel.
 
 ### Milestone 0.3 — Project-aware Workflow
 

@@ -51,6 +51,14 @@
   import "monaco-editor/min/vs/editor/editor.main.css";
   import { languageFromPath } from "$lib/editor/languages";
   import type { MonacoEditorController } from "$lib/editor/types";
+  import {
+    lspLanguageFromPath,
+    requestLspCompletion,
+    requestLspDefinition,
+    requestLspFormatting,
+    requestLspHover,
+    type LspDiagnostic,
+  } from "$lib/services/lsp";
 
   export let content = "";
   export let path: string;
@@ -58,7 +66,13 @@
   export let minimap = false;
   export let wordWrap = false;
   export let gitDiff: string | null = null;
+  export let workspaceRoot: string | null = null;
+  export let diagnostics: LspDiagnostic[] = [];
   export let onChange: (content: string) => void;
+  export let onCursorChange: (position: {
+    lineNumber: number;
+    column: number;
+  }) => void;
   export let onReady: (controller: MonacoEditorController) => void;
 
   let container: HTMLDivElement;
@@ -67,8 +81,10 @@
   let gitDecorationCollection: monaco.editor.IEditorDecorationsCollection | null =
     null;
   let changeSubscription: monaco.IDisposable | null = null;
+  let cursorSubscription: monaco.IDisposable | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let currentModelPath: string | null = null;
+  let lspProvidersRegistered = false;
   const viewStates = new Map<
     string,
     monaco.editor.ICodeEditorViewState | null
@@ -93,8 +109,13 @@
     model.setValue(content);
   }
 
+  $: if (model) {
+    applyDiagnostics(diagnostics);
+  }
+
   onMount(() => {
     defineThemes();
+    registerLspProviders();
     editor = monaco.editor.create(container, {
       automaticLayout: false,
       fontFamily:
@@ -122,6 +143,7 @@
 
   onDestroy(() => {
     changeSubscription?.dispose();
+    cursorSubscription?.dispose();
     if (model && currentModelPath) {
       viewStates.set(currentModelPath, editor?.saveViewState() ?? null);
     }
@@ -180,6 +202,7 @@
     editor.setModel(model);
     currentModelPath = nextPath;
     applyGitDecorations(gitDiff);
+    applyDiagnostics(diagnostics);
     const viewState = viewStates.get(nextPath);
     if (viewState) {
       editor.restoreViewState(viewState);
@@ -188,6 +211,10 @@
     changeSubscription?.dispose();
     changeSubscription = model.onDidChangeContent(() => {
       onChange(model?.getValue() ?? "");
+    });
+    cursorSubscription?.dispose();
+    cursorSubscription = editor.onDidChangeCursorPosition((event) => {
+      onCursorChange(event.position);
     });
   }
 
@@ -279,6 +306,286 @@
     }
 
     return [...changedLines];
+  }
+
+  function applyDiagnostics(nextDiagnostics: LspDiagnostic[]) {
+    if (!model) {
+      return;
+    }
+
+    monaco.editor.setModelMarkers(
+      model,
+      "larik-lsp",
+      nextDiagnostics.map((diagnostic) => ({
+        startLineNumber: diagnostic.range.start.line + 1,
+        startColumn: diagnostic.range.start.character + 1,
+        endLineNumber: diagnostic.range.end.line + 1,
+        endColumn: diagnostic.range.end.character + 1,
+        message: diagnostic.message,
+        source: diagnostic.source ?? "LSP",
+        severity: diagnosticSeverity(diagnostic.severity),
+      })),
+    );
+  }
+
+  function diagnosticSeverity(severity: number | undefined) {
+    if (severity === 1) return monaco.MarkerSeverity.Error;
+    if (severity === 2) return monaco.MarkerSeverity.Warning;
+    if (severity === 3) return monaco.MarkerSeverity.Info;
+    return monaco.MarkerSeverity.Hint;
+  }
+
+  function registerLspProviders() {
+    if (lspProvidersRegistered) {
+      return;
+    }
+    lspProvidersRegistered = true;
+
+    const languages = ["typescript", "javascript", "html", "rust", "go", "php"];
+    for (const language of languages) {
+      monaco.languages.registerCompletionItemProvider(language, {
+        triggerCharacters: [".", '"', "'", "/", "@", "<"],
+        async provideCompletionItems(providerModel, position) {
+          const context = lspContext(providerModel);
+          if (!context) {
+            return { suggestions: [] };
+          }
+
+          const result = await requestLspCompletion({
+            ...context,
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+          });
+
+          const word = providerModel.getWordUntilPosition(position);
+          const range = new monaco.Range(
+            position.lineNumber,
+            word.startColumn,
+            position.lineNumber,
+            word.endColumn,
+          );
+
+          return {
+            suggestions: completionItems(result).map((item) => ({
+              label: completionLabel(item),
+              kind: completionKind(item.kind),
+              detail: item.detail,
+              documentation: completionDocumentation(item.documentation),
+              insertText: item.insertText ?? completionLabel(item),
+              range,
+            })),
+          };
+        },
+      });
+
+      monaco.languages.registerHoverProvider(language, {
+        async provideHover(providerModel, position) {
+          const context = lspContext(providerModel);
+          if (!context) {
+            return null;
+          }
+
+          const result = await requestLspHover({
+            ...context,
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+          });
+          const contents = hoverContents(result);
+          return contents.length > 0 ? { contents } : null;
+        },
+      });
+
+      monaco.languages.registerDefinitionProvider(language, {
+        async provideDefinition(providerModel, position) {
+          const context = lspContext(providerModel);
+          if (!context) {
+            return null;
+          }
+
+          const result = await requestLspDefinition({
+            ...context,
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+          });
+
+          return definitionLocations(result);
+        },
+      });
+
+      monaco.languages.registerDocumentFormattingEditProvider(language, {
+        async provideDocumentFormattingEdits(providerModel) {
+          const context = lspContext(providerModel);
+          if (!context) {
+            return [];
+          }
+
+          const result = await requestLspFormatting(
+            context.rootPath,
+            context.languageId,
+            context.path,
+          );
+
+          return textEdits(result);
+        },
+      });
+    }
+  }
+
+  function lspContext(providerModel: monaco.editor.ITextModel) {
+    const modelPath = providerModel.uri.fsPath;
+    const languageId = lspLanguageFromPath(modelPath);
+    if (!workspaceRoot || !languageId) {
+      return null;
+    }
+
+    return {
+      rootPath: workspaceRoot,
+      languageId,
+      path: modelPath,
+    };
+  }
+
+  type RawCompletionItem = {
+    label?: string | { label?: string };
+    kind?: number;
+    detail?: string;
+    documentation?: string | { value?: string };
+    insertText?: string;
+  };
+
+  function completionItems(result: unknown): RawCompletionItem[] {
+    if (Array.isArray(result)) {
+      return result as RawCompletionItem[];
+    }
+    if (
+      result &&
+      typeof result === "object" &&
+      "items" in result &&
+      Array.isArray((result as { items: unknown }).items)
+    ) {
+      return (result as { items: RawCompletionItem[] }).items;
+    }
+
+    return [];
+  }
+
+  function completionLabel(item: RawCompletionItem) {
+    if (typeof item.label === "string") {
+      return item.label;
+    }
+
+    return item.label?.label ?? item.insertText ?? "";
+  }
+
+  function completionDocumentation(
+    documentation: RawCompletionItem["documentation"],
+  ) {
+    if (!documentation) {
+      return undefined;
+    }
+    if (typeof documentation === "string") {
+      return documentation;
+    }
+
+    return { value: documentation.value ?? "" };
+  }
+
+  function completionKind(kind: number | undefined) {
+    if (!kind) {
+      return monaco.languages.CompletionItemKind.Text;
+    }
+
+    const map: Record<number, monaco.languages.CompletionItemKind> = {
+      1: monaco.languages.CompletionItemKind.Text,
+      2: monaco.languages.CompletionItemKind.Method,
+      3: monaco.languages.CompletionItemKind.Function,
+      4: monaco.languages.CompletionItemKind.Constructor,
+      5: monaco.languages.CompletionItemKind.Field,
+      6: monaco.languages.CompletionItemKind.Variable,
+      7: monaco.languages.CompletionItemKind.Class,
+      8: monaco.languages.CompletionItemKind.Interface,
+      9: monaco.languages.CompletionItemKind.Module,
+      10: monaco.languages.CompletionItemKind.Property,
+      14: monaco.languages.CompletionItemKind.Keyword,
+      15: monaco.languages.CompletionItemKind.Snippet,
+      17: monaco.languages.CompletionItemKind.File,
+      18: monaco.languages.CompletionItemKind.Reference,
+    };
+
+    return map[kind] ?? monaco.languages.CompletionItemKind.Text;
+  }
+
+  function hoverContents(result: unknown) {
+    if (!result || typeof result !== "object" || !("contents" in result)) {
+      return [];
+    }
+
+    const contents = (result as { contents: unknown }).contents;
+    const items = Array.isArray(contents) ? contents : [contents];
+    return items
+      .map((item) => {
+        if (typeof item === "string") {
+          return { value: item };
+        }
+        if (item && typeof item === "object" && "value" in item) {
+          return { value: String((item as { value: unknown }).value) };
+        }
+        return null;
+      })
+      .filter((item): item is { value: string } => item !== null);
+  }
+
+  function definitionLocations(result: unknown) {
+    const items = Array.isArray(result) ? result : result ? [result] : [];
+    const locations: monaco.languages.Location[] = [];
+    for (const item of items) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const location = item as { uri?: string; range?: LspDiagnostic["range"] };
+      if (!location.uri || !location.range) {
+        continue;
+      }
+
+      locations.push({
+        uri: monaco.Uri.parse(location.uri),
+        range: toMonacoRange(location.range),
+      });
+    }
+
+    return locations;
+  }
+
+  function textEdits(result: unknown) {
+    if (!Array.isArray(result)) {
+      return [];
+    }
+
+    const edits: monaco.languages.TextEdit[] = [];
+    for (const item of result) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const edit = item as { range?: LspDiagnostic["range"]; newText?: string };
+      if (!edit.range) {
+        continue;
+      }
+      edits.push({
+        range: toMonacoRange(edit.range),
+        text: edit.newText ?? "",
+      });
+    }
+
+    return edits;
+  }
+
+  function toMonacoRange(range: LspDiagnostic["range"]) {
+    return new monaco.Range(
+      range.start.line + 1,
+      range.start.character + 1,
+      range.end.line + 1,
+      range.end.character + 1,
+    );
   }
 </script>
 

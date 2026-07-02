@@ -15,6 +15,7 @@
     baseCommandMetadata,
     createCommandRegistry,
   } from "$lib/commands/registry";
+  import { languageFromPath } from "$lib/editor/languages";
   import type { MonacoEditorController } from "$lib/editor/types";
   import type { FuzzySearchItem } from "$lib/search/fuzzy";
   import { getGitDiff } from "$lib/services/git";
@@ -31,6 +32,15 @@
     stageFile,
     unstageFile,
   } from "$lib/stores/git";
+  import {
+    closeSyncedLspDocument,
+    ensureLspDocument,
+    lspState,
+    lspStatusLabel,
+    registerLspEvents,
+    syncLspDocumentChange,
+    syncLspDocumentSave,
+  } from "$lib/stores/lsp";
   import {
     clearProjectDetection,
     markProjectActionFailed,
@@ -50,6 +60,7 @@
     closeTab,
     createEntry,
     deleteEntry,
+    documents,
     diskChange,
     editorPreferences,
     expandedFolders,
@@ -65,7 +76,7 @@
     reloadFileTree,
     renameEntry,
     reopenRecentlyClosedTab,
-    saveActiveDocument,
+    saveActiveDocument as saveActiveDocumentStore,
     saveAllDocuments,
     setActiveView,
     setBottomHeight,
@@ -103,6 +114,8 @@
   let syncedRootPath: string | null = null;
   let gitGutterDiff: string | null = null;
   let gitGutterKey: string | null = null;
+  let cursorPosition = { lineNumber: 1, column: 1 };
+  let activeLspDocumentKey: string | null = null;
 
   $: commandRegistry = createCommandRegistry(
     baseCommandMetadata.map((command) => ({
@@ -151,11 +164,25 @@
     gitGutterDiff = null;
   }
   $: activeGitDiffView = activeGitDiff();
+  $: if ($workspace.rootPath && $activeDocument && !$activeDocument.binary) {
+    const nextLspKey = `${$workspace.rootPath}:${$activeDocument.path}`;
+    if (nextLspKey !== activeLspDocumentKey) {
+      activeLspDocumentKey = nextLspKey;
+      ensureLspDocument(
+        $workspace.rootPath,
+        $activeDocument.path,
+        $activeDocument.content,
+      );
+    }
+  } else if (!$activeDocument && activeLspDocumentKey) {
+    activeLspDocumentKey = null;
+  }
 
   onMount(() => {
     initializeWorkspace();
     registerWorkspaceWatcher();
     registerTerminalEvents();
+    registerLspEvents();
     window.addEventListener("keydown", handleKeydown);
 
     return () => window.removeEventListener("keydown", handleKeydown);
@@ -223,7 +250,7 @@
     }
   }
 
-  function closeTabWithConfirmation(tabId: string) {
+  async function closeTabWithConfirmation(tabId: string) {
     const tab = $tabs.find((item) => item.id === tabId);
 
     if (!tab) {
@@ -242,12 +269,16 @@
       );
     }
 
+    if ($workspace.rootPath && tab.path !== "larik://welcome") {
+      await closeSyncedLspDocument($workspace.rootPath, tab.path);
+    }
+
     if (closeTab(tabId)) {
       editorController?.disposeModel(tab.path);
     }
   }
 
-  function closeOtherTabsWithConfirmation(tabId: string) {
+  async function closeOtherTabsWithConfirmation(tabId: string) {
     const dirtyTabs = $tabs.filter((tab) => tab.id !== tabId && tab.dirty);
 
     if (
@@ -259,6 +290,9 @@
 
     for (const tab of $tabs) {
       if (tab.id !== tabId && tab.id !== "welcome") {
+        if ($workspace.rootPath) {
+          await closeSyncedLspDocument($workspace.rootPath, tab.path);
+        }
         editorController?.disposeModel(tab.path);
       }
     }
@@ -274,7 +308,7 @@
     closeOtherTabs(tabId);
   }
 
-  function closeAllTabsWithConfirmation() {
+  async function closeAllTabsWithConfirmation() {
     const dirtyTabs = $tabs.filter((tab) => tab.dirty);
 
     if (
@@ -286,6 +320,9 @@
 
     for (const tab of $tabs) {
       if (tab.id !== "welcome") {
+        if ($workspace.rootPath) {
+          await closeSyncedLspDocument($workspace.rootPath, tab.path);
+        }
         editorController?.disposeModel(tab.path);
       }
     }
@@ -299,8 +336,8 @@
 
   function executeCommand(command: KeybindingCommandId) {
     if (command === "workspace.openFolder") openWorkspace();
-    if (command === "editor.save") saveActiveDocument();
-    if (command === "editor.saveAll") saveAllDocuments();
+    if (command === "editor.save") saveActiveEditorDocument();
+    if (command === "editor.saveAll") saveAllEditorDocuments();
     if (command === "file.quickOpen") quickOpenOpen = true;
     if (command === "commandPalette.open") {
       commandPaletteOpen = true;
@@ -346,6 +383,38 @@
 
   function selectQuickOpenFile(item: FuzzySearchItem) {
     openFile(item.id);
+  }
+
+  function handleEditorChange(content: string) {
+    updateActiveDocument(content);
+    if ($workspace.rootPath && $activeDocument) {
+      syncLspDocumentChange($workspace.rootPath, $activeDocument.path, content);
+    }
+  }
+
+  async function saveActiveEditorDocument() {
+    const document = $activeDocument;
+    await saveActiveDocumentStore();
+    if ($workspace.rootPath && document) {
+      await syncLspDocumentSave(
+        $workspace.rootPath,
+        document.path,
+        document.content,
+      );
+    }
+  }
+
+  async function saveAllEditorDocuments() {
+    const rootPath = $workspace.rootPath;
+    const openDocuments = Object.values($documents);
+    await saveAllDocuments();
+    if (!rootPath) {
+      return;
+    }
+
+    for (const document of openDocuments) {
+      await syncLspDocumentSave(rootPath, document.path, document.content);
+    }
   }
 
   async function syncWorkspaceViews(rootPath: string) {
@@ -507,6 +576,24 @@
     }
   }
 
+  async function stageGitFilesFromPanel(files: GitChangedFile[]) {
+    if (!$workspace.rootPath) {
+      return;
+    }
+    for (const file of files) {
+      await stageFile($workspace.rootPath, file);
+    }
+  }
+
+  async function unstageGitFilesFromPanel(files: GitChangedFile[]) {
+    if (!$workspace.rootPath) {
+      return;
+    }
+    for (const file of files) {
+      await unstageFile($workspace.rootPath, file);
+    }
+  }
+
   async function commitGitFromPanel() {
     if (!$workspace.rootPath || !$gitState.commitMessage.trim()) {
       return;
@@ -640,6 +727,38 @@
     return action.destructive
       ? "text-[var(--warning)]"
       : "text-[var(--text-subtle)]";
+  }
+
+  function activeLanguageLabel() {
+    if (!$activeDocument) {
+      return "Plain Text";
+    }
+
+    return languageFromPath($activeDocument.path);
+  }
+
+  function activeDiagnosticCount() {
+    return $activeDocument
+      ? ($lspState.diagnostics[$activeDocument.path]?.length ?? 0)
+      : 0;
+  }
+
+  function allDiagnostics() {
+    return Object.entries($lspState.diagnostics).flatMap(
+      ([path, diagnostics]) =>
+        diagnostics.map((diagnostic) => ({ path, diagnostic })),
+    );
+  }
+
+  function diagnosticSeverityLabel(severity: number | undefined) {
+    if (severity === 1) return "error";
+    if (severity === 2) return "warning";
+    if (severity === 3) return "info";
+    return "hint";
+  }
+
+  function openDiagnostic(path: string) {
+    openFile(path);
   }
 </script>
 
@@ -1079,9 +1198,20 @@
 
                 {#if stagedGitFiles().length > 0}
                   <div class="mb-4 space-y-1">
-                    <p class="text-xs font-medium text-[var(--text-muted)]">
-                      Staged
-                    </p>
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="text-xs font-medium text-[var(--text-muted)]">
+                        Staged ({stagedGitFiles().length})
+                      </p>
+                      <button
+                        type="button"
+                        class="text-xs text-[var(--text-subtle)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={$gitState.operation !== null}
+                        onclick={() =>
+                          unstageGitFilesFromPanel(stagedGitFiles())}
+                      >
+                        Unstage All
+                      </button>
+                    </div>
                     <GitChangeTree
                       files={stagedGitFiles()}
                       action="unstage"
@@ -1098,9 +1228,20 @@
 
                 {#if unstagedGitFiles().length > 0}
                   <div class="mb-4 space-y-1">
-                    <p class="text-xs font-medium text-[var(--text-muted)]">
-                      Changes
-                    </p>
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="text-xs font-medium text-[var(--text-muted)]">
+                        Changes ({unstagedGitFiles().length})
+                      </p>
+                      <button
+                        type="button"
+                        class="text-xs text-[var(--text-subtle)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={$gitState.operation !== null}
+                        onclick={() =>
+                          stageGitFilesFromPanel(unstagedGitFiles())}
+                      >
+                        Stage All
+                      </button>
+                    </div>
                     <GitChangeTree
                       files={unstagedGitFiles()}
                       action="stage"
@@ -1117,9 +1258,20 @@
 
                 {#if untrackedGitFiles().length > 0}
                   <div class="mb-4 space-y-1">
-                    <p class="text-xs font-medium text-[var(--text-muted)]">
-                      Untracked
-                    </p>
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="text-xs font-medium text-[var(--text-muted)]">
+                        Untracked ({untrackedGitFiles().length})
+                      </p>
+                      <button
+                        type="button"
+                        class="text-xs text-[var(--text-subtle)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={$gitState.operation !== null}
+                        onclick={() =>
+                          stageGitFilesFromPanel(untrackedGitFiles())}
+                      >
+                        Stage All
+                      </button>
+                    </div>
                     <GitChangeTree
                       files={untrackedGitFiles()}
                       action="stage"
@@ -1304,7 +1456,7 @@
                   <button
                     type="button"
                     class="rounded-md border border-[var(--border)] px-3 py-1 text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
-                    onclick={saveActiveDocument}
+                    onclick={saveActiveEditorDocument}
                   >
                     Save
                   </button>
@@ -1317,7 +1469,12 @@
                 minimap={$editorPreferences.minimap}
                 wordWrap={$editorPreferences.wordWrap}
                 gitDiff={gitGutterDiff}
-                onChange={updateActiveDocument}
+                workspaceRoot={$workspace.rootPath}
+                diagnostics={$lspState.diagnostics[$activeDocument.path] ?? []}
+                onChange={handleEditorChange}
+                onCursorChange={(position) => {
+                  cursorPosition = position;
+                }}
                 onReady={(controller) => {
                   editorController = controller;
                 }}
@@ -1404,7 +1561,35 @@
               class="h-[calc(100%-2.25rem)] p-3 font-mono text-xs text-[var(--text-muted)]"
             >
               {#if $panelState.bottomView === "problems"}
-                <p>No problems detected.</p>
+                {#if allDiagnostics().length === 0}
+                  <p>No problems detected.</p>
+                {:else}
+                  <div class="space-y-1">
+                    {#each allDiagnostics() as item}
+                      <button
+                        type="button"
+                        class="flex w-full min-w-0 items-start gap-3 rounded px-2 py-1 text-left hover:bg-[var(--surface-muted)]"
+                        onclick={() => openDiagnostic(item.path)}
+                      >
+                        <span
+                          class={`w-16 shrink-0 ${item.diagnostic.severity === 1 ? "text-[var(--danger)]" : item.diagnostic.severity === 2 ? "text-[var(--warning)]" : "text-[var(--info)]"}`}
+                        >
+                          {diagnosticSeverityLabel(item.diagnostic.severity)}
+                        </span>
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate text-[var(--text)]">
+                            {item.diagnostic.message}
+                          </span>
+                          <span
+                            class="block truncate text-[var(--text-subtle)]"
+                          >
+                            {item.path}:{item.diagnostic.range.start.line + 1}
+                          </span>
+                        </span>
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
               {:else}
                 <div class="space-y-2">
                   <p>Workspace events and command output will appear here.</p>
@@ -1412,7 +1597,7 @@
                     <button
                       type="button"
                       class="rounded border border-[var(--border)] px-2 py-1 hover:border-[var(--accent)]"
-                      onclick={saveAllDocuments}
+                      onclick={saveAllEditorDocuments}
                     >
                       Save all
                     </button>
@@ -1450,31 +1635,50 @@
   </div>
 
   <footer
-    class="flex h-6 shrink-0 items-center justify-between border-t border-[var(--border-muted)] bg-[var(--surface)] px-3 text-xs text-[var(--text-subtle)]"
+    class="flex h-6 shrink-0 items-center justify-between border-t border-[var(--border-muted)] bg-[var(--surface)] text-xs text-[var(--text-subtle)]"
   >
-    <div class="flex min-w-0 items-center gap-4">
-      <span>{$workspace.rootPath ? "Workspace" : "No workspace"}</span>
-      {#if $workspace.rootPath}
-        <span class="truncate">{$workspace.rootPath}</span>
-      {/if}
-    </div>
-    <div class="flex items-center gap-4">
+    <div class="flex min-w-0 items-center">
       <button
-        class="hover:text-[var(--text)]"
+        class="h-6 px-3 hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
         type="button"
-        onclick={() => setActiveView("git")}
+        title={$workspace.rootPath ?? "No workspace"}
+        onclick={() => selectShellView("git")}
       >
         {gitIndicatorLabel()}
       </button>
       <button
-        class="hover:text-[var(--text)]"
+        class={`h-6 px-3 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] ${activeDiagnosticCount() > 0 ? "text-[var(--warning)]" : ""}`}
+        type="button"
+        onclick={() => {
+          setBottomView("problems");
+          if (!$panelState.bottomVisible) {
+            toggleBottomPanel();
+          }
+        }}
+      >
+        Problems {activeDiagnosticCount()}
+      </button>
+      <button
+        class="h-6 px-3 hover:bg-[var(--surface-muted)] hover:text-[var(--text)]"
         type="button"
         onclick={toggleBottomPanel}
       >
         {$panelState.bottomVisible ? "Hide Panel" : "Show Panel"}
       </button>
-      <span>UTF-8</span>
-      <span>Ln 1, Col 1</span>
+    </div>
+    <div class="flex items-center">
+      <button
+        class={`h-6 px-3 hover:bg-[var(--surface-muted)] hover:text-[var(--text)] ${$lspState.error ? "text-[var(--danger)]" : ""}`}
+        type="button"
+        title={$lspState.error ?? "Language server status"}
+      >
+        {lspStatusLabel($activeDocument?.path ?? null)}
+      </button>
+      <span class="h-6 px-3 leading-6">{activeLanguageLabel()}</span>
+      <span class="h-6 px-3 leading-6">UTF-8</span>
+      <span class="h-6 px-3 leading-6">
+        Ln {cursorPosition.lineNumber}, Col {cursorPosition.column}
+      </span>
     </div>
   </footer>
 </main>

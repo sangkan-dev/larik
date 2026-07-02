@@ -4,6 +4,7 @@ use tauri::{
 };
 
 mod git;
+mod lsp;
 mod project_detector;
 mod terminal;
 mod workspace;
@@ -29,6 +30,7 @@ pub fn run() {
     builder
         .manage(workspace::WorkspaceWatcher(Default::default()))
         .manage(terminal::TerminalState(Default::default()))
+        .manage(lsp::LspState::default())
         .setup(|app| {
             let handle = app.handle();
             let reload = MenuItemBuilder::with_id(MENU_RELOAD, "Reload Window")
@@ -75,6 +77,16 @@ pub fn run() {
             git::git_commit,
             git::git_diff_file,
             git::git_generate_commit_message,
+            lsp::lsp_start,
+            lsp::lsp_stop,
+            lsp::lsp_document_open,
+            lsp::lsp_document_change,
+            lsp::lsp_document_save,
+            lsp::lsp_document_close,
+            lsp::lsp_completion,
+            lsp::lsp_hover,
+            lsp::lsp_definition,
+            lsp::lsp_formatting,
             terminal::terminal_spawn,
             terminal::terminal_write,
             terminal::terminal_resize,
